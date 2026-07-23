@@ -13,7 +13,7 @@
 // double-submitted.
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const herdr = process.env.HERDR_BIN_PATH || "herdr";
@@ -24,9 +24,47 @@ const iconPath = join(import.meta.dir, "assets", "herdr.png");
 // Terminal and its alert style cannot be set separately in System Settings.
 const bundledAlerter = join(import.meta.dir, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
 const ALERTER = existsSync(bundledAlerter) ? bundledAlerter : "alerter";
-const NOTIFICATION_TIMEOUT_SECS = "120";
 const MAX_BUTTON_LABEL = 40;
 const PANE_READ_LINES = "40";
+
+const DEFAULTS = {
+  timeout: 120,             // seconds the notification waits for a click
+  sound: "",                // alerter sound name; "" = silent
+  suppress_when_focused: true, // stay quiet if you are already looking at the pane
+};
+
+// Flat `key = value` TOML, same shape as the example config. Values are quoted
+// strings, bare booleans, or integers.
+function loadConfig() {
+  const cfg = { ...DEFAULTS };
+  const dir = process.env.HERDR_PLUGIN_CONFIG_DIR;
+  if (!dir) return cfg;
+  let text;
+  try {
+    text = readFileSync(join(dir, "config.toml"), "utf8");
+  } catch {
+    return cfg; // no config file -> defaults
+  }
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || line.startsWith("[")) continue;
+    const eq = line.indexOf("=");
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    const raw = line.slice(eq + 1).trim();
+    if (raw[0] === '"' || raw[0] === "'") {
+      const end = raw.indexOf(raw[0], 1);
+      cfg[key] = end > 0 ? raw.slice(1, end) : raw.slice(1);
+      continue;
+    }
+    const bare = raw.replace(/\s+#.*$/, "").trim();
+    cfg[key] = bare === "true" ? true : bare === "false" ? false : /^-?\d+$/.test(bare) ? parseInt(bare, 10) : bare;
+  }
+  const t = parseInt(cfg.timeout, 10);
+  cfg.timeout = Number.isFinite(t) && t > 0 ? t : DEFAULTS.timeout;
+  cfg.suppress_when_focused = cfg.suppress_when_focused !== false;
+  return cfg;
+}
 
 function run(args) {
   const r = spawnSync(herdr, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -128,6 +166,20 @@ function focusPane(paneId) {
   activateTerminal();
 }
 
+// You are "looking at" the pane when it is the focused pane in herdr *and* the
+// terminal is the frontmost app -- then herdr's own in-app toast is enough.
+function userIsWatching(pane) {
+  if (!pane?.focused) return false;
+  const r = spawnSync(
+    "osascript",
+    ["-e", 'tell application "System Events" to name of first process whose frontmost is true'],
+    { encoding: "utf8" },
+  );
+  const front = (r.stdout || "").trim().toLowerCase();
+  if (!front) return false;
+  return ["kitty", "ghostty", "iterm", "iterm2", "wezterm", "alacritty", "terminal"].some((t) => front.includes(t));
+}
+
 function stillBlocked(paneId) {
   try {
     return json(["pane", "get", paneId])?.result?.pane?.agent_status === "blocked";
@@ -143,6 +195,7 @@ function main() {
   const ctx = JSON.parse(process.env.HERDR_PLUGIN_CONTEXT_JSON || "null");
   const paneId = ev?.pane_id || ctx?.pane?.pane_id || process.env.HERDR_PANE_ID;
   if (!paneId) return;
+  const cfg = loadConfig();
 
   // Event path only fires the notification on the idle/working -> blocked flip;
   // the manual `notify` action skips this gate for testing.
@@ -154,11 +207,17 @@ function main() {
   // Title = the tab's label (what the user sees in the tab bar), so the
   // notification says *which* session is asking.
   let heading = "";
+  let pane;
   try {
-    const pane = json(["pane", "get", paneId])?.result?.pane;
+    pane = json(["pane", "get", paneId])?.result?.pane;
     const tabId = pane?.tab_id;
     heading = (tabId && json(["tab", "get", tabId])?.result?.tab?.label) || pane?.label || "";
   } catch {}
+
+  if (cfg.suppress_when_focused && userIsWatching(pane)) {
+    console.log(`suppressed: ${paneId} is focused and the terminal is frontmost`);
+    return;
+  }
 
   // "visible" = the current screen -- the approval UI is on it by definition.
   const screen = run(["pane", "read", paneId, "--source", "visible", "--lines", PANE_READ_LINES]);
@@ -171,11 +230,12 @@ function main() {
   const args = [
     "--title", "Herdr",
     "--message", message,
-    "--timeout", NOTIFICATION_TIMEOUT_SECS,
+    "--timeout", String(cfg.timeout),
     "--group", paneId, // replaces a stale notification for the same pane
   ];
   args.push("--subtitle", heading || `${agent} needs input`);
   if (existsSync(iconPath)) args.push("--app-icon", iconPath);
+  if (cfg.sound) args.push("--sound", cfg.sound);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
 
   const r = spawnSync(ALERTER, args, { encoding: "utf8" });

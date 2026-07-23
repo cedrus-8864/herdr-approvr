@@ -1,0 +1,16 @@
+# Approvr -- configuration
+#
+# Copy to your plugin config dir to customize:
+#   herdr plugin config-dir cedrus.approvr
+#
+# All keys are optional; omitted keys use the defaults shown below.
+
+# Seconds the notification waits for a click before giving up.
+timeout = 120
+
+# alerter sound name, e.g. "Ping", "Glass", "Submarine". Empty = silent.
+sound = ""
+
+# Stay quiet when the blocked pane is already focused *and* the terminal is the
+# frontmost app -- herdr's own in-app toast already tells you in that case.
+suppress_when_focused = true

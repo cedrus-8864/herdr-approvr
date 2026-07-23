@@ -148,7 +148,9 @@ function main() {
   const choice = (r.stdout || "").trim();
 
   if (!choice || choice === "@TIMEOUT" || choice === "@CLOSED" || choice === "@DISMISSED") return;
-  if (choice === "@CONTENTCLICKED") {
+  // Body click, or the default "Show" button when we had no actions to offer:
+  // both mean "take me there" in macOS terms.
+  if (choice === "@CONTENTCLICKED" || choice === "@ACTIONCLICKED") {
     run(["pane", "focus", paneId]);
     return;
   }

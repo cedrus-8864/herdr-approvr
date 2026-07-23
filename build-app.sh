@@ -1,42 +1,26 @@
 #!/bin/sh
-# Wrap the `alerter` binary in an .app bundle so macOS gives our notifications
-# their own identity: a "Herdr Approvr" entry in System Settings > Notifications
-# (set it to Alerts so the buttons stay on screen), the herdr icon, and no
-# borrowing of Terminal's notification settings.
+# Compile the Swift notifier into an .app bundle so macOS gives our
+# notifications their own identity: a "Herdr Approvr" entry in System Settings >
+# Notifications (set it to Alerts so the buttons stay on screen), the herdr
+# icon, and no borrowing of Terminal's notification settings.
 #
-# Usage: ./build-app.sh [path-to-alerter]      (default: whatever is on PATH)
+# UNUserNotificationCenter only works from inside a bundle, so the bundle is a
+# hard requirement, not branding.
 set -eu
 
 root=$(cd "$(dirname "$0")" && pwd)
 app="$root/assets/HerdrApprovr.app"
-alerter=${1:-$(command -v alerter || true)}
 
-# Pinned alerter release, downloaded when none is on PATH. The checksum pins the
-# exact binary we tested; a new release must be re-verified, not just re-pointed.
-ALERTER_URL="https://github.com/vjeantet/alerter/releases/download/v26.5/alerter-26.5.zip"
-ALERTER_SHA256="11f63cddc9bb3f8554ed9b762632a120cfa7bee05e3c09d65734823e09d24f10"
-
-if [ -z "$alerter" ] || [ ! -x "$alerter" ]; then
-  echo "alerter not on PATH; downloading pinned release..."
-  tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' EXIT
-  curl -fsSL "$ALERTER_URL" -o "$tmp/alerter.zip"
-  echo "$ALERTER_SHA256  $tmp/alerter.zip" | shasum -a 256 -c - >/dev/null || {
-    echo "alerter download failed checksum verification -- aborting" >&2
-    exit 1
-  }
-  unzip -oq "$tmp/alerter.zip" -d "$tmp"
-  alerter="$tmp/alerter"
-  chmod +x "$alerter"
+if ! command -v swiftc >/dev/null 2>&1; then
+  echo "swiftc not found -- install the Xcode Command Line Tools: xcode-select --install" >&2
+  exit 1
 fi
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp "$alerter" "$app/Contents/MacOS/HerdrApprovr"
-chmod +x "$app/Contents/MacOS/HerdrApprovr"
+swiftc -O -swift-version 5 "$root/notifier.swift" -o "$app/Contents/MacOS/HerdrApprovr"
 
-# The icon must be .icns for the bundle; alerter's --app-icon still works for
-# the per-notification image.
+# The icon must be .icns for the bundle.
 if [ -f "$root/assets/herdr.icns" ]; then
   cp "$root/assets/herdr.icns" "$app/Contents/Resources/HerdrApprovr.icns"
 fi

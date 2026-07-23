@@ -13,31 +13,23 @@
 // double-submitted.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const herdr = process.env.HERDR_BIN_PATH || "herdr";
-const iconPath = join(here, "assets", "herdr.png");
 
-// Prefer the bundled .app (built by build-app.sh). A bare alerter binary has no
-// notification identity of its own, so macOS files its notifications under
-// Terminal and its alert style cannot be set separately in System Settings.
-const bundledAlerter = join(here, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
-const HAS_BUNDLE = existsSync(bundledAlerter);
-const ALERTER = HAS_BUNDLE ? bundledAlerter : "alerter";
-
-// alerter impersonates com.apple.Terminal unless told otherwise, so without
-// --sender our notifications inherit Terminal's identity: no entry of our own
-// in System Settings, hence no way to set the alert style they need.
-const SENDER = "dev.cedrus.herdr-approvr";
+// The Swift notifier (built by build-app.sh) posts and exits; the system
+// launches it again to handle the click, so no process waits around. The .app
+// bundle is a hard requirement -- UNUserNotificationCenter refuses bare
+// binaries.
+const NOTIFIER = join(here, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
 const MAX_BUTTON_LABEL = 40;
 const PANE_READ_LINES = "40";
 
 const DEFAULTS = {
-  timeout: 120,             // seconds the notification waits for a click
-  sound: "",                // alerter sound name; "" = silent
+  sound: "",                // notification sound name; "" = silent
   suppress_when_focused: true, // stay quiet if you are already looking at the pane
   notify_done: false,       // also notify (without buttons) when an agent finishes
 };
@@ -69,8 +61,6 @@ function loadConfig() {
     const bare = raw.replace(/\s+#.*$/, "").trim();
     cfg[key] = bare === "true" ? true : bare === "false" ? false : /^-?\d+$/.test(bare) ? parseInt(bare, 10) : bare;
   }
-  const t = parseInt(cfg.timeout, 10);
-  cfg.timeout = Number.isFinite(t) && t > 0 ? t : DEFAULTS.timeout;
   cfg.suppress_when_focused = cfg.suppress_when_focused !== false;
   cfg.notify_done = cfg.notify_done === true;
   return cfg;
@@ -140,41 +130,16 @@ export function parseApproval(text) {
   return { question, context, options };
 }
 
-// Button labels: alerter's --actions is comma-separated, so commas must go.
+// Cap button labels: macOS ellipsises them anyway, and a bounded label keeps
+// the action rows readable when the notification is expanded.
 function buttonLabel(label) {
-  const clean = label.replace(/,/g, ";").replace(/\s+/g, " ").trim();
+  const clean = label.replace(/\s+/g, " ").trim();
   return clean.length > MAX_BUTTON_LABEL ? `${[...clean].slice(0, MAX_BUTTON_LABEL - 1).join("")}…` : clean;
 }
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-
-// Bring the terminal app to the front -- `pane focus` only switches panes
-// inside herdr. Best effort: activate the first known terminal that is running.
-function activateTerminal() {
-  const terminals = [
-    ["kitty", "kitty"],
-    ["ghostty", "Ghostty"],
-    ["iTerm2", "iTerm"],
-    ["wezterm-gui", "WezTerm"],
-    ["alacritty", "Alacritty"],
-    ["Terminal", "Terminal"],
-  ];
-  for (const [proc, app] of terminals) {
-    if (spawnSync("pgrep", ["-xq", proc]).status === 0) {
-      spawnSync("open", ["-a", app]);
-      return;
-    }
-  }
-}
-
-function focusPane(paneId) {
-  // `pane focus` is direction-only; `agent focus` accepts a pane id and jumps
-  // workspace + tab + pane. Blocked panes are always agent panes.
-  run(["agent", "focus", paneId]);
-  activateTerminal();
-}
 
 // herdr can post its own system notification for the same blocked agent, which
 // then sits next to ours saying the same thing without buttons. We do not touch
@@ -207,12 +172,12 @@ function userIsWatching(pane) {
   return ["kitty", "ghostty", "iterm", "iterm2", "wezterm", "alacritty", "terminal"].some((t) => front.includes(t));
 }
 
-function stillBlocked(paneId) {
-  try {
-    return json(["pane", "get", paneId])?.result?.pane?.agent_status === "blocked";
-  } catch {
-    return false; // pane gone
-  }
+// The responder instance is launched by the system with a near-empty PATH, so
+// it needs an absolute herdr path baked into the notification.
+function herdrAbsolutePath() {
+  if (herdr.includes("/")) return herdr;
+  const r = spawnSync("sh", ["-c", `command -v ${herdr}`], { encoding: "utf8" });
+  return (r.stdout || "").trim() || herdr;
 }
 
 function main() {
@@ -229,11 +194,7 @@ function main() {
   // already dealt with. Notifications are grouped by pane id, so this only ever
   // removes our own.
   if (process.env.HERDR_PLUGIN_EVENT === "pane.focused") {
-    // --sender is as load-bearing here as it is when posting: without it the
-    // removal targets Terminal's notification center and silently does nothing.
-    const args = ["--remove", paneId];
-    if (HAS_BUNDLE) args.push("--sender", SENDER);
-    spawnSync(ALERTER, args, { encoding: "utf8" });
+    spawnSync(NOTIFIER, ["--remove", paneId], { encoding: "utf8" });
     return;
   }
 
@@ -272,50 +233,31 @@ function main() {
     : (approval?.context.length ? approval.context.join("\n") : "") ||
       approval?.question || topic || "Waiting for your answer";
 
+  // Post and exit. The system relaunches the notifier to handle the click, so
+  // there is no waiting process; click outcomes land in
+  // ~/Library/Logs/HerdrApprovr.log via the responder.
   const args = [
     "--title", "Herdr",
     "--message", message,
-    "--timeout", String(cfg.timeout),
     "--group", paneId, // replaces a stale notification for the same pane
+    "--pane", paneId,
+    "--herdr", herdrAbsolutePath(),
   ];
   // A finished agent's message is just its topic, so without this the
   // notification looks identical to a prompt waiting for an answer.
   const state = isDone ? "finished" : "needs input";
   args.push("--subtitle", heading ? (isDone ? `${heading} — finished` : heading) : `${agent} ${state}`);
-  if (HAS_BUNDLE) args.push("--sender", SENDER);
-  if (existsSync(iconPath)) args.push("--app-icon", iconPath);
   if (cfg.sound) args.push("--sound", cfg.sound);
-  if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
+  for (const option of approval?.options ?? []) {
+    args.push("--action", `${option.digit}=${buttonLabel(option.label)}`);
+  }
 
   warnIfHerdrAlsoNotifies();
-  const r = spawnSync(ALERTER, args, { encoding: "utf8" });
-  if (r.error) throw new Error(`alerter not found -- install it from https://github.com/vjeantet/alerter`);
-  const choice = (r.stdout || "").trim();
-
-  // Every exit path logs its outcome -- silence here is indistinguishable from
-  // a crash when something goes wrong in the field.
-  if (!choice || choice === "@TIMEOUT" || choice === "@CLOSED" || choice === "@DISMISSED") {
-    console.log(`dismissed: ${choice || "(no choice)"} for ${paneId}`);
-    return;
+  const r = spawnSync(NOTIFIER, args, { encoding: "utf8" });
+  if (r.error || r.status !== 0) {
+    throw new Error(`notifier failed -- run build-app.sh first (${(r.stderr || "").trim()})`);
   }
-  // Body click, or the default "Show" button when we had no actions to offer:
-  // both mean "take me there" in macOS terms.
-  if (choice === "@CONTENTCLICKED" || choice === "@ACTIONCLICKED") {
-    focusPane(paneId);
-    return;
-  }
-
-  const picked = approval?.options.find((o) => buttonLabel(o.label) === choice);
-  if (!picked) {
-    console.log(`unmatched: alerter returned ${JSON.stringify(choice)} for ${paneId}`);
-    return;
-  }
-  if (!stillBlocked(paneId)) {
-    console.log(`skipped: ${paneId} no longer blocked (answered in terminal?)`);
-    return;
-  }
-  run(["pane", "send-keys", paneId, picked.digit]);
-  console.log(`answered: sent "${picked.digit}" (${picked.label}) to ${paneId}`);
+  console.log(`posted: ${isDone ? "done" : "prompt"} notification for ${paneId} (${approval?.options.length ?? 0} action(s))`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

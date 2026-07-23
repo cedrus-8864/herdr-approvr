@@ -66,6 +66,8 @@ herdr server reload-config
 Note what `"herdr"` costs you: herdr's system notifications also cover agents
 that *finish*, which this plugin ignores by default. Set `notify_done = true` in
 the plugin config to take that over too, and the switch loses you nothing.
+(Per-class opt-out, so neither side has to reimplement the other, is requested in
+[herdr#1791](https://github.com/ogulcancelik/herdr/issues/1791).)
 
 `"off"` also stops the duplicate, but then nothing tells you an agent is blocked
 while you are looking at herdr — this plugin deliberately stays quiet in that
@@ -102,8 +104,7 @@ Skipping step 1 is not harmful, just untidy: macOS prunes dangling registrations
 when it rebuilds its database, and the **Herdr Approvr** row in System Settings
 disappears on its own schedule. There is no supported command to delete one
 notification entry. herdr has no uninstall hook, which is why this is manual —
-see [herdr#…](https://github.com/ogulcancelik/herdr/issues) if you want it
-automated.
+tracked in [herdr#1791](https://github.com/ogulcancelik/herdr/issues/1791).
 
 ## How it works
 

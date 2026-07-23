@@ -66,15 +66,22 @@ export function parseApproval(text) {
   }
   if (options.length < 2) return null;
 
-  // Nearest question line above the list, if any.
-  let question = "";
-  for (let i = start - 1; i >= 0 && i >= start - 15; i--) {
-    if (/\?$/.test(lines[i])) {
-      question = lines[i];
-      break;
-    }
+  // Context above the list: the approval block's content (tool name, command,
+  // question). It ends upward at a horizontal rule or at conversation chrome
+  // (status spinner, tool output, prompt lines). Long commands are compressed
+  // to head + tail -- the head names the tool and command, the tail holds the
+  // question.
+  let context = [];
+  for (let i = start - 1; i >= 0 && context.length < 40; i--) {
+    const line = lines[i];
+    if (/^[╭╰]?[─━┄┈-]{3,}[╮╯]?$/.test(line)) break;
+    if (/^[✻⏺⎿❯✳✽·※]/.test(line)) break;
+    if (!line) continue;
+    context.unshift(line);
   }
-  return { question, options };
+  if (context.length > 7) context = [...context.slice(0, 4), "…", ...context.slice(-2)];
+  const question = [...context].reverse().find((l) => /\?$/.test(l)) || "";
+  return { question, context, options };
 }
 
 // Button labels: alerter's --actions is comma-separated, so commas must go.
@@ -110,17 +117,30 @@ function main() {
   const agent = ev?.display_agent || ev?.agent || ctx?.pane?.agent || "agent";
   const topic = String(ev?.title || "").replace(/[\x00-\x1f\x7f]/g, " ").trim();
 
+  // Title = the tab's label (what the user sees in the tab bar), so the
+  // notification says *which* session is asking.
+  let heading = "";
+  try {
+    const pane = json(["pane", "get", paneId])?.result?.pane;
+    const tabId = pane?.tab_id;
+    heading = (tabId && json(["tab", "get", tabId])?.result?.tab?.label) || pane?.label || "";
+  } catch {}
+
   // "visible" = the current screen -- the approval UI is on it by definition.
   const screen = run(["pane", "read", paneId, "--source", "visible", "--lines", PANE_READ_LINES]);
   const approval = parseApproval(screen);
 
+  const message =
+    (approval?.context.length ? approval.context.join("\n") : "") ||
+    approval?.question || topic || "Waiting for your answer";
+
   const args = [
-    "--title", `${agent} needs input`,
-    "--message", approval?.question || topic || "Waiting for your answer",
+    "--title", heading || `${agent} needs input`,
+    "--message", message,
     "--timeout", NOTIFICATION_TIMEOUT_SECS,
     "--group", paneId, // replaces a stale notification for the same pane
   ];
-  if (topic && approval?.question) args.push("--subtitle", topic);
+  if (heading) args.push("--subtitle", `${agent} needs input`);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
 
   const r = spawnSync(ALERTER, args, { encoding: "utf8" });

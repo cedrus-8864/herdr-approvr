@@ -18,7 +18,12 @@ import { join } from "node:path";
 
 const herdr = process.env.HERDR_BIN_PATH || "herdr";
 const iconPath = join(import.meta.dir, "assets", "herdr.png");
-const ALERTER = "alerter";
+
+// Prefer the bundled .app (built by build-app.sh). A bare alerter binary has no
+// notification identity of its own, so macOS files its notifications under
+// Terminal and its alert style cannot be set separately in System Settings.
+const bundledAlerter = join(import.meta.dir, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
+const ALERTER = existsSync(bundledAlerter) ? bundledAlerter : "alerter";
 const NOTIFICATION_TIMEOUT_SECS = "120";
 const MAX_BUTTON_LABEL = 40;
 const PANE_READ_LINES = "40";

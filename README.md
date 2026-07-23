@@ -24,9 +24,20 @@ pane for you. No need to hunt for the right tab.
   unzip -o /tmp/alerter.zip -d ~/.local/bin && chmod +x ~/.local/bin/alerter
   ```
 
-  On first use macOS asks to allow notifications for "alerter" — accept, then
-  set its style to **Alerts** in System Settings → Notifications so buttons
-  stay on screen.
+Then build the notification app bundle:
+
+```sh
+./build-app.sh
+```
+
+This wraps `alerter` in `assets/HerdrApprovr.app`. Without it, a bare `alerter`
+binary has no notification identity of its own — macOS files its notifications
+under **Terminal**, so you cannot set their alert style separately and the
+buttons inherit whatever Terminal is set to.
+
+After the first notification, set **Herdr Approvr** to **Alerts** in System
+Settings → Notifications, so the notification waits for you instead of sliding
+away after a few seconds.
 
 ## Install
 

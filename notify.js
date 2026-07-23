@@ -94,6 +94,30 @@ function buttonLabel(label) {
 // Main
 // ---------------------------------------------------------------------------
 
+// Bring the terminal app to the front -- `pane focus` only switches panes
+// inside herdr. Best effort: activate the first known terminal that is running.
+function activateTerminal() {
+  const terminals = [
+    ["kitty", "kitty"],
+    ["ghostty", "Ghostty"],
+    ["iTerm2", "iTerm"],
+    ["wezterm-gui", "WezTerm"],
+    ["alacritty", "Alacritty"],
+    ["Terminal", "Terminal"],
+  ];
+  for (const [proc, app] of terminals) {
+    if (spawnSync("pgrep", ["-xq", proc]).status === 0) {
+      spawnSync("open", ["-a", app]);
+      return;
+    }
+  }
+}
+
+function focusPane(paneId) {
+  run(["pane", "focus", paneId]);
+  activateTerminal();
+}
+
 function stillBlocked(paneId) {
   try {
     return json(["pane", "get", paneId])?.result?.pane?.agent_status === "blocked";
@@ -151,7 +175,7 @@ function main() {
   // Body click, or the default "Show" button when we had no actions to offer:
   // both mean "take me there" in macOS terms.
   if (choice === "@CONTENTCLICKED" || choice === "@ACTIONCLICKED") {
-    run(["pane", "focus", paneId]);
+    focusPane(paneId);
     return;
   }
 

@@ -1,0 +1,18 @@
+id = "cedrus.approvr"
+name = "Approvr"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Answer agent permission prompts straight from a macOS notification with real buttons (via alerter)."
+platforms = ["macos"]
+
+# Manual trigger for testing the notification UI on the focused pane:
+#   herdr plugin action invoke cedrus.approvr.notify
+[[actions]]
+id = "notify"
+title = "Notify for this pane's prompt"
+contexts = ["pane"]
+command = ["bun", "notify.js"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bun", "notify.js"]

@@ -77,10 +77,20 @@ herdr plugin action invoke cedrus.approvr.notify # notification for the focused 
 herdr plugin log list --plugin cedrus.approvr --limit 5
 ```
 
+## Configuration
+
+Optional. Drop a `config.toml` in the plugin's config dir (find it with
+`herdr plugin config-dir cedrus.approvr`); see
+[`examples/default-config.toml`](examples/default-config.toml).
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `timeout` | `120` | Seconds the notification waits for a click. |
+| `sound` | `""` | alerter sound name (`"Ping"`, `"Glass"`, …); empty is silent. |
+| `suppress_when_focused` | `true` | Stay quiet when the pane is focused and the terminal is frontmost. |
+
 ## Limitations (v1)
 
-- No focus suppression: the notification fires even if you're looking at the
-  pane. (herdr shows its own in-app blocker toast too.)
 - Option labels are matched back by text; two options with identical first 40
   characters would collide (not the case in practice).
 - `alerter` blocks until click or a 120s timeout; each prompt spawns one

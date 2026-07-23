@@ -5,10 +5,7 @@
 #
 # All keys are optional; omitted keys use the defaults shown below.
 
-# Seconds the notification waits for a click before giving up.
-timeout = 120
-
-# alerter sound name, e.g. "Ping", "Glass", "Submarine". Empty = silent.
+# Notification sound name, e.g. "Ping", "Glass", "Submarine". Empty = silent.
 sound = ""
 
 # Stay quiet when the pane is already focused *and* the terminal is the

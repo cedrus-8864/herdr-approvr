@@ -18,7 +18,7 @@ fi
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-swiftc -O -swift-version 5 "$root/notifier.swift" -o "$app/Contents/MacOS/HerdrApprovr"
+swiftc -O -swift-version 5 -enable-bare-slash-regex "$root/notifier.swift" -o "$app/Contents/MacOS/HerdrApprovr"
 
 # The icon must be .icns for the bundle.
 if [ -f "$root/assets/herdr.icns" ]; then

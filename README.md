@@ -20,16 +20,19 @@ and the answer is typed into the right pane for you.
 
 ## Install
 
-Needs macOS and either [bun](https://bun.sh) or node ≥ 18.
+Needs macOS with the Xcode Command Line Tools (`xcode-select --install` — you
+have them if you have git). No other runtime: the plugin is a single Swift
+binary compiled at install.
 
 ```sh
 herdr plugin install cedrus-8864/herdr-approvr
 ```
 
-The install builds a small `HerdrApprovr.app` wrapper for
-[alerter](https://github.com/vjeantet/alerter) (downloaded automatically,
-SHA-256 pinned). The wrapper is what gives the notifications their own identity,
-icon, and settings entry instead of masquerading as Terminal.
+The install compiles `HerdrApprovr.app`, which talks to the system's
+notification center directly (`UNUserNotificationCenter` — the supported API,
+not the deprecated one CLI notifiers ride on). Posting is fire-and-exit: when
+you click, macOS relaunches the binary to deliver your answer, so nothing sits
+around waiting.
 
 Then, once:
 
@@ -98,11 +101,12 @@ to head `…` tail:
 
 On `pane.agent_status_changed` → `blocked` (herdr sets that exactly when an
 approval/question UI is visible), the plugin reads the visible screen, parses
-the bottom-most numbered option list and the question above it, and posts the
-notification via the bundled alerter. A clicked label is mapped back to its
-digit and sent with `pane send-keys` — after re-checking the pane is still
-blocked. On `pane.focused`, the pane's notification is withdrawn. Unparseable
-prompts still notify; clicking focuses the pane.
+the bottom-most numbered option list and the question above it, and posts a
+notification whose actions carry the option digits. Clicking an action
+relaunches the binary; it re-checks the pane is still blocked, then answers
+with `pane send-keys`. On `pane.focused`, the pane's notification is withdrawn.
+Unparseable prompts still notify; clicking focuses the pane. Click outcomes are
+appended to `~/Library/Logs/HerdrApprovr.log`.
 
 ## Uninstall
 
@@ -122,16 +126,17 @@ own schedule. Automating this needs an uninstall hook in herdr, tracked in
   Banners; set **Herdr Approvr** to **Alerts**.
 - **Two notifications per prompt** → herdr's own system toast is on; set
   `[ui.toast] delivery = "herdr"`.
-- **Notification shows under "Terminal"** → the app wrapper is missing; run
-  `./build-app.sh` from the plugin directory.
-- Every outcome is logged:
-  `herdr plugin log list --plugin cedrus.approvr --limit 5`.
+- **No notification at all** → the app bundle is missing; run `./build-app.sh`
+  from the plugin directory. Parser check: `assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr --self-test`.
+- Posting outcomes: `herdr plugin log list --plugin cedrus.approvr --limit 5`.
+  Click outcomes: `tail ~/Library/Logs/HerdrApprovr.log`.
 
 ## Credits
 
-[alerter](https://github.com/vjeantet/alerter) (MIT) delivers the
-notifications. The herdr logo comes from
+The herdr logo comes from
 [dot/herdr-terminal-notifier](https://github.com/dot/herdr-terminal-notifier).
+Earlier versions delivered via [alerter](https://github.com/vjeantet/alerter);
+the notifier is now a native Swift binary.
 
 ## License
 

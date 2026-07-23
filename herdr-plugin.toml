@@ -1,6 +1,6 @@
 id = "cedrus.approvr"
 name = "Approvr"
-version = "0.2.0"
+version = "0.3.0"
 # Plugin v1 landed in 0.7.0, but whether those releases run [[build]] commands is
 # unverified -- and without the bundle the notifications silently degrade to
 # Terminal's identity. 0.7.5 is what this was actually tested against.
@@ -21,13 +21,13 @@ platforms = ["macos"]
 id = "notify"
 title = "Notify for this pane's prompt"
 contexts = ["pane"]
-command = ["./run.sh"]
+command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]
 
 [[events]]
 on = "pane.agent_status_changed"
-command = ["./run.sh"]
+command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]
 
 # Landing on the pane makes its notification stale -- withdraw it.
 [[events]]
 on = "pane.focused"
-command = ["./run.sh"]
+command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]

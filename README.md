@@ -30,10 +30,11 @@ Then build the notification app bundle:
 ./build-app.sh
 ```
 
-This wraps `alerter` in `assets/HerdrApprovr.app`. Without it, a bare `alerter`
-binary has no notification identity of its own — macOS files its notifications
-under **Terminal**, so you cannot set their alert style separately and the
-buttons inherit whatever Terminal is set to.
+This wraps `alerter` in `assets/HerdrApprovr.app` and registers it with Launch
+Services. `alerter` impersonates `com.apple.Terminal` unless told otherwise, so
+the plugin passes `--sender dev.cedrus.herdr-approvr` to claim that bundle
+instead — without it, the notifications land under **Terminal** and you cannot
+set their alert style separately.
 
 After the first notification, set **Herdr Approvr** to **Alerts** in System
 Settings → Notifications, so the notification waits for you instead of sliding

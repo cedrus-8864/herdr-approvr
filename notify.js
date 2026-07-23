@@ -23,7 +23,13 @@ const iconPath = join(import.meta.dir, "assets", "herdr.png");
 // notification identity of its own, so macOS files its notifications under
 // Terminal and its alert style cannot be set separately in System Settings.
 const bundledAlerter = join(import.meta.dir, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
-const ALERTER = existsSync(bundledAlerter) ? bundledAlerter : "alerter";
+const HAS_BUNDLE = existsSync(bundledAlerter);
+const ALERTER = HAS_BUNDLE ? bundledAlerter : "alerter";
+
+// alerter impersonates com.apple.Terminal unless told otherwise, so without
+// --sender our notifications inherit Terminal's identity: no entry of our own
+// in System Settings, hence no way to set the alert style they need.
+const SENDER = "dev.cedrus.herdr-approvr";
 const MAX_BUTTON_LABEL = 40;
 const PANE_READ_LINES = "40";
 
@@ -234,6 +240,7 @@ function main() {
     "--group", paneId, // replaces a stale notification for the same pane
   ];
   args.push("--subtitle", heading || `${agent} needs input`);
+  if (HAS_BUNDLE) args.push("--sender", SENDER);
   if (existsSync(iconPath)) args.push("--app-icon", iconPath);
   if (cfg.sound) args.push("--sound", cfg.sound);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));

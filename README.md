@@ -86,6 +86,13 @@ herdr plugin log list --plugin cedrus.approvr --limit 5
 - `alerter` blocks until click or a 120s timeout; each prompt spawns one
   short-lived process.
 
+## Credits
+
+- Notifications are delivered by [alerter](https://github.com/vjeantet/alerter) (MIT).
+- `assets/herdr.icns` is the herdr logo, taken from
+  [dot/herdr-terminal-notifier](https://github.com/dot/herdr-terminal-notifier);
+  `assets/herdr.png` is a PNG render of it.
+
 ## License
 
 MIT

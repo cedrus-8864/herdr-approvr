@@ -62,8 +62,10 @@ herdr server reload-config
 2. Reads the visible screen (`pane read --source visible`) and parses the
    bottom-most numbered option list (`❯ 1. Yes …`), plus the nearest question
    line above it.
-3. Shows the notification via `alerter --actions`. With more than one option,
-   macOS puts them in a dropdown on the button.
+3. Shows the notification via `alerter --actions`. macOS renders about three
+   message lines until the notification is expanded, which is why the tool name
+   and command come first. The options live behind the **Options ⌄** button
+   (each becomes its own row once expanded), next to the default **Show**.
 4. Maps the clicked label back to its digit and sends it — after re-checking
    the pane is still blocked.
 

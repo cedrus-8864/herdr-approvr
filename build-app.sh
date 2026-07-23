@@ -57,3 +57,29 @@ codesign --force --deep --sign - "$app" 2>/dev/null || true
   -f "$app" 2>/dev/null || true
 
 echo "built $app"
+
+# herdr can post its own (buttonless) system notification for the same blocked
+# agent. We only report it -- rewriting the user's global config from an
+# install script would be a surprise they never agreed to.
+herdr_config="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/config.toml"
+if [ -f "$herdr_config" ] && grep -qE '^[[:space:]]*delivery[[:space:]]*=[[:space:]]*"system"' "$herdr_config"; then
+  cat <<EOF
+
+NOTE: $herdr_config has [ui.toast] delivery = "system", so herdr posts its own
+notification for every blocked agent. Alongside this plugin you will get two,
+and herdr's has no answer buttons. To keep the in-app toast and leave desktop
+notifications to this plugin:
+
+    [ui.toast]
+    delivery = "herdr"
+
+then: herdr server reload-config
+EOF
+fi
+
+cat <<'EOF'
+
+NEXT: trigger one notification, then set "Herdr Approvr" to Alerts in
+System Settings > Notifications. As a Banner it slides away in seconds and
+takes the answer buttons with it.
+EOF

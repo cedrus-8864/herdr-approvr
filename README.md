@@ -26,18 +26,20 @@ pane for you. No need to hunt for the right tab.
 
 ## Install
 
+**1. Install the plugin.**
+
 ```sh
 herdr plugin install cedrus-8864/herdr-approvr
 ```
 
-Install runs `build-app.sh`, which wraps `alerter` in
-`assets/HerdrApprovr.app` and registers it with Launch Services. That bundle is
-not cosmetic: `alerter` impersonates `com.apple.Terminal` unless told otherwise,
-so without it the notifications land under **Terminal**, where you cannot set
-their alert style and the buttons disappear with the banner. The plugin passes
+This runs `build-app.sh`, which wraps `alerter` in `assets/HerdrApprovr.app`,
+ad-hoc signs it, and registers it with Launch Services. The bundle is not
+cosmetic: `alerter` impersonates `com.apple.Terminal` unless told otherwise, so
+without it the notifications land under **Terminal**, where their alert style
+cannot be set and the buttons disappear with the banner. The plugin passes
 `--sender dev.cedrus.herdr-approvr` to claim the bundle instead.
 
-Local development — `herdr plugin link` skips build commands, so build by hand:
+*Local development:* `herdr plugin link` skips build commands, so build by hand:
 
 ```sh
 git clone https://github.com/cedrus-8864/herdr-approvr
@@ -45,28 +47,59 @@ cd herdr-approvr && ./build-app.sh
 herdr plugin link . && herdr server reload-config
 ```
 
-### After installing
+**2. Fix the toast delivery, if the install script tells you to.**
 
-1. Trigger one notification, then set **Herdr Approvr** to **Alerts** in System
-   Settings → Notifications. As a Banner it slides away in seconds and the
-   buttons go with it.
-2. If your `~/.config/herdr/config.toml` has `[ui.toast] delivery = "system"`,
-   herdr posts its own buttonless notification for the same blocked agent and
-   you get two. Set it to `"herdr"` to keep the in-app toast and leave desktop
-   notifications to this plugin. (The plugin notes this in its log rather than
-   editing your config.)
+`build-app.sh` reads your herdr config and warns when `[ui.toast]
+delivery = "system"` is set — that makes herdr post its own buttonless
+notification for the same blocked agent, so you get two. It never edits the
+file; that is your call:
+
+```toml
+[ui.toast]
+delivery = "herdr"    # in-app toast; leave desktop notifications to this plugin
+```
+
+```sh
+herdr server reload-config
+```
+
+`"off"` also stops the duplicate, but then nothing tells you an agent is blocked
+while you are looking at herdr — this plugin deliberately stays quiet in that
+case (`suppress_when_focused`).
+
+**3. Set the alert style.** Trigger one notification (block an agent, or run
+`herdr plugin action invoke cedrus.approvr.notify` from a blocked pane), then set
+**Herdr Approvr** to **Alerts** in System Settings → Notifications. The row only
+appears once a notification has been delivered. Left as a Banner, it slides away
+after a few seconds and takes the answer buttons with it.
 
 ## Uninstall
 
+**1. Undo what the install registered**, while the checkout still exists:
+
 ```sh
-./uninstall.sh                 # unregister + delete the .app bundle
+./uninstall.sh
+```
+
+It unregisters the bundle from Launch Services and deletes it. It also prints
+the command for removing your plugin config, which herdr leaves behind.
+
+**2. Remove the plugin:**
+
+```sh
 herdr plugin uninstall cedrus.approvr
 ```
 
-Run them in that order: uninstalling a GitHub-managed plugin removes the
-checkout, taking `uninstall.sh` with it. The **Herdr Approvr** row in System
-Settings outlives the bundle — macOS prunes it on its own schedule and offers no
-command to remove one entry.
+Order matters: uninstalling a GitHub-managed plugin deletes the checkout, taking
+`uninstall.sh` and the bundle with it — leaving a Launch Services entry pointing
+at a path that no longer exists.
+
+Skipping step 1 is not harmful, just untidy: macOS prunes dangling registrations
+when it rebuilds its database, and the **Herdr Approvr** row in System Settings
+disappears on its own schedule. There is no supported command to delete one
+notification entry. herdr has no uninstall hook, which is why this is manual —
+see [herdr#…](https://github.com/ogulcancelik/herdr/issues) if you want it
+automated.
 
 ## How it works
 

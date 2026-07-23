@@ -22,9 +22,12 @@ pane for you. No need to hunt for the right tab.
   formula; grab the zip from its releases page:
 
   ```sh
-  curl -sL https://github.com/vjeantet/alerter/releases/latest/download/alerter-26.5.zip -o /tmp/alerter.zip
+  curl -sL https://github.com/vjeantet/alerter/releases/download/v26.5/alerter-26.5.zip -o /tmp/alerter.zip
   unzip -o /tmp/alerter.zip -d ~/.local/bin && chmod +x ~/.local/bin/alerter
   ```
+
+  (Pinned on purpose: `releases/latest/download/` resolves the *release* but not
+  the asset name, so it 404s the moment a new version renames the zip.)
 
 ## Install
 
@@ -157,8 +160,12 @@ Optional. Drop a `config.toml` in the plugin's config dir (find it with
 
 - Option labels are matched back by text; two options with identical first 40
   characters would collide (not the case in practice).
-- `alerter` blocks until click or a 120s timeout; each prompt spawns one
-  short-lived process.
+- `alerter` blocks until the notification is answered, withdrawn, or hits
+  `timeout`, so each prompt holds one short-lived process for that long.
+- Verified on herdr 0.7.5 / macOS 26.5. Earlier herdr releases have plugin v1
+  (0.7.0+) but it is unconfirmed whether they run `[[build]]` commands, and
+  without the bundle the notifications quietly fall back to Terminal's identity
+  — hence `min_herdr_version = "0.7.5"`.
 
 ## Credits
 

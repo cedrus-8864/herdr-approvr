@@ -1,7 +1,10 @@
 id = "cedrus.approvr"
 name = "Approvr"
-version = "0.1.0"
-min_herdr_version = "0.7.0"
+version = "0.2.0"
+# Plugin v1 landed in 0.7.0, but whether those releases run [[build]] commands is
+# unverified -- and without the bundle the notifications silently degrade to
+# Terminal's identity. 0.7.5 is what this was actually tested against.
+min_herdr_version = "0.7.5"
 description = "Answer agent permission prompts straight from a macOS notification with real buttons (via alerter)."
 platforms = ["macos"]
 

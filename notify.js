@@ -13,8 +13,11 @@
 // double-submitted.
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 const herdr = process.env.HERDR_BIN_PATH || "herdr";
+const iconPath = join(import.meta.dir, "assets", "herdr.png");
 const ALERTER = "alerter";
 const NOTIFICATION_TIMEOUT_SECS = "120";
 const MAX_BUTTON_LABEL = 40;
@@ -167,6 +170,7 @@ function main() {
     "--group", paneId, // replaces a stale notification for the same pane
   ];
   args.push("--subtitle", heading || `${agent} needs input`);
+  if (existsSync(iconPath)) args.push("--app-icon", iconPath);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
 
   const r = spawnSync(ALERTER, args, { encoding: "utf8" });

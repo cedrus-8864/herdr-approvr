@@ -11,9 +11,23 @@ root=$(cd "$(dirname "$0")" && pwd)
 app="$root/assets/HerdrApprovr.app"
 alerter=${1:-$(command -v alerter || true)}
 
+# Pinned alerter release, downloaded when none is on PATH. The checksum pins the
+# exact binary we tested; a new release must be re-verified, not just re-pointed.
+ALERTER_URL="https://github.com/vjeantet/alerter/releases/download/v26.5/alerter-26.5.zip"
+ALERTER_SHA256="11f63cddc9bb3f8554ed9b762632a120cfa7bee05e3c09d65734823e09d24f10"
+
 if [ -z "$alerter" ] || [ ! -x "$alerter" ]; then
-  echo "alerter not found. Install it first: https://github.com/vjeantet/alerter" >&2
-  exit 1
+  echo "alerter not on PATH; downloading pinned release..."
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  curl -fsSL "$ALERTER_URL" -o "$tmp/alerter.zip"
+  echo "$ALERTER_SHA256  $tmp/alerter.zip" | shasum -a 256 -c - >/dev/null || {
+    echo "alerter download failed checksum verification -- aborting" >&2
+    exit 1
+  }
+  unzip -oq "$tmp/alerter.zip" -d "$tmp"
+  alerter="$tmp/alerter"
+  chmod +x "$alerter"
 fi
 
 rm -rf "$app"

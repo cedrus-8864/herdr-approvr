@@ -14,15 +14,17 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+const here = dirname(fileURLToPath(import.meta.url));
 const herdr = process.env.HERDR_BIN_PATH || "herdr";
-const iconPath = join(import.meta.dir, "assets", "herdr.png");
+const iconPath = join(here, "assets", "herdr.png");
 
 // Prefer the bundled .app (built by build-app.sh). A bare alerter binary has no
 // notification identity of its own, so macOS files its notifications under
 // Terminal and its alert style cannot be set separately in System Settings.
-const bundledAlerter = join(import.meta.dir, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
+const bundledAlerter = join(here, "assets", "HerdrApprovr.app", "Contents", "MacOS", "HerdrApprovr");
 const HAS_BUNDLE = existsSync(bundledAlerter);
 const ALERTER = HAS_BUNDLE ? bundledAlerter : "alerter";
 
@@ -316,7 +318,7 @@ function main() {
   console.log(`answered: sent "${picked.digit}" (${picked.label}) to ${paneId}`);
 }
 
-if (import.meta.main) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     main();
   } catch (err) {

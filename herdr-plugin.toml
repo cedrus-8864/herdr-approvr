@@ -21,13 +21,13 @@ platforms = ["macos"]
 id = "notify"
 title = "Notify for this pane's prompt"
 contexts = ["pane"]
-command = ["bun", "notify.js"]
+command = ["./run.sh"]
 
 [[events]]
 on = "pane.agent_status_changed"
-command = ["bun", "notify.js"]
+command = ["./run.sh"]
 
 # Landing on the pane makes its notification stale -- withdraw it.
 [[events]]
 on = "pane.focused"
-command = ["bun", "notify.js"]
+command = ["./run.sh"]

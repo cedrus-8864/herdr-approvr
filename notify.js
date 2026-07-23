@@ -135,12 +135,12 @@ function main() {
     approval?.question || topic || "Waiting for your answer";
 
   const args = [
-    "--title", heading || `${agent} needs input`,
+    "--title", "Herdr",
     "--message", message,
     "--timeout", NOTIFICATION_TIMEOUT_SECS,
     "--group", paneId, // replaces a stale notification for the same pane
   ];
-  if (heading) args.push("--subtitle", `${agent} needs input`);
+  args.push("--subtitle", heading || `${agent} needs input`);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
 
   const r = spawnSync(ALERTER, args, { encoding: "utf8" });

@@ -114,7 +114,9 @@ function activateTerminal() {
 }
 
 function focusPane(paneId) {
-  run(["pane", "focus", paneId]);
+  // `pane focus` is direction-only; `agent focus` accepts a pane id and jumps
+  // workspace + tab + pane. Blocked panes are always agent panes.
+  run(["agent", "focus", paneId]);
   activateTerminal();
 }
 

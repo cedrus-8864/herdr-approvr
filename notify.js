@@ -177,7 +177,12 @@ function main() {
   if (r.error) throw new Error(`alerter not found -- install it from https://github.com/vjeantet/alerter`);
   const choice = (r.stdout || "").trim();
 
-  if (!choice || choice === "@TIMEOUT" || choice === "@CLOSED" || choice === "@DISMISSED") return;
+  // Every exit path logs its outcome -- silence here is indistinguishable from
+  // a crash when something goes wrong in the field.
+  if (!choice || choice === "@TIMEOUT" || choice === "@CLOSED" || choice === "@DISMISSED") {
+    console.log(`dismissed: ${choice || "(no choice)"} for ${paneId}`);
+    return;
+  }
   // Body click, or the default "Show" button when we had no actions to offer:
   // both mean "take me there" in macOS terms.
   if (choice === "@CONTENTCLICKED" || choice === "@ACTIONCLICKED") {
@@ -186,7 +191,10 @@ function main() {
   }
 
   const picked = approval?.options.find((o) => buttonLabel(o.label) === choice);
-  if (!picked) return;
+  if (!picked) {
+    console.log(`unmatched: alerter returned ${JSON.stringify(choice)} for ${paneId}`);
+    return;
+  }
   if (!stillBlocked(paneId)) {
     console.log(`skipped: ${paneId} no longer blocked (answered in terminal?)`);
     return;

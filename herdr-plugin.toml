@@ -23,3 +23,8 @@ command = ["bun", "notify.js"]
 [[events]]
 on = "pane.agent_status_changed"
 command = ["bun", "notify.js"]
+
+# Landing on the pane makes its notification stale -- withdraw it.
+[[events]]
+on = "pane.focused"
+command = ["bun", "notify.js"]

@@ -11,6 +11,8 @@ pane for you. No need to hunt for the right tab.
 - Answered it in the terminal already? The plugin re-checks the pane is still
   `blocked` before sending, so nothing is ever double-submitted
 - One notification per pane (`--group`), replaced when a newer prompt appears
+- Landing on the pane withdraws its notification, so answering in the terminal
+  never leaves a stale prompt on screen
 
 ## Requirements
 
@@ -108,9 +110,9 @@ tracked in [herdr#1791](https://github.com/ogulcancelik/herdr/issues/1791).
 
 ## How it works
 
-1. Subscribes to `pane.agent_status_changed`; acts only on the flip to
-   `blocked` — herdr sets that exactly when a known approval/question UI is
-   visible in the pane.
+1. Subscribes to `pane.agent_status_changed`; acts on the flip to `blocked` —
+   herdr sets that exactly when a known approval/question UI is visible in the
+   pane — and to `done` when `notify_done` is on.
 2. Reads the visible screen (`pane read --source visible`) and parses the
    bottom-most numbered option list (`❯ 1. Yes …`), plus the nearest question
    line above it.
@@ -123,6 +125,12 @@ tracked in [herdr#1791](https://github.com/ogulcancelik/herdr/issues/1791).
 
 If no option list can be parsed (unknown prompt style), you still get a plain
 notification; clicking it focuses the pane.
+
+It also subscribes to `pane.focused` and withdraws that pane's notification
+(`alerter --remove <pane-id>`, matching the `--group` it was posted under). This
+covers the common case where you answer in the terminal and the notification is
+left behind — the safety check would have refused to send anyway, but a stale
+prompt on screen is its own annoyance.
 
 ## Testing
 

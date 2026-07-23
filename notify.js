@@ -222,6 +222,19 @@ function main() {
   if (!paneId) return;
   const cfg = loadConfig();
 
+  // Arriving at the pane answers the notification's question: you are here now.
+  // Withdraw it rather than leave a stale prompt on screen for a pane you have
+  // already dealt with. Notifications are grouped by pane id, so this only ever
+  // removes our own.
+  if (process.env.HERDR_PLUGIN_EVENT === "pane.focused") {
+    // --sender is as load-bearing here as it is when posting: without it the
+    // removal targets Terminal's notification center and silently does nothing.
+    const args = ["--remove", paneId];
+    if (HAS_BUNDLE) args.push("--sender", SENDER);
+    spawnSync(ALERTER, args, { encoding: "utf8" });
+    return;
+  }
+
   // Event path fires on the flip to `blocked`, and to `done` when the user opted
   // in; the manual `notify` action skips this gate for testing.
   const isDone = ev?.agent_status === "done";

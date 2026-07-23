@@ -63,6 +63,10 @@ delivery = "herdr"    # in-app toast; leave desktop notifications to this plugin
 herdr server reload-config
 ```
 
+Note what `"herdr"` costs you: herdr's system notifications also cover agents
+that *finish*, which this plugin ignores by default. Set `notify_done = true` in
+the plugin config to take that over too, and the switch loses you nothing.
+
 `"off"` also stops the duplicate, but then nothing tells you an agent is blocked
 while you are looking at herdr — this plugin deliberately stays quiet in that
 case (`suppress_when_focused`).
@@ -138,6 +142,7 @@ Optional. Drop a `config.toml` in the plugin's config dir (find it with
 | `timeout` | `120` | Seconds the notification waits for a click. |
 | `sound` | `""` | alerter sound name (`"Ping"`, `"Glass"`, …); empty is silent. |
 | `suppress_when_focused` | `true` | Stay quiet when the pane is focused and the terminal is frontmost. |
+| `notify_done` | `false` | Also notify when an agent finishes (no buttons; click jumps to the pane). |
 
 ## Limitations (v1)
 

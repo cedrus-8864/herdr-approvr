@@ -37,6 +37,7 @@ const DEFAULTS = {
   timeout: 120,             // seconds the notification waits for a click
   sound: "",                // alerter sound name; "" = silent
   suppress_when_focused: true, // stay quiet if you are already looking at the pane
+  notify_done: false,       // also notify (without buttons) when an agent finishes
 };
 
 // Flat `key = value` TOML, same shape as the example config. Values are quoted
@@ -69,6 +70,7 @@ function loadConfig() {
   const t = parseInt(cfg.timeout, 10);
   cfg.timeout = Number.isFinite(t) && t > 0 ? t : DEFAULTS.timeout;
   cfg.suppress_when_focused = cfg.suppress_when_focused !== false;
+  cfg.notify_done = cfg.notify_done === true;
   return cfg;
 }
 
@@ -220,9 +222,10 @@ function main() {
   if (!paneId) return;
   const cfg = loadConfig();
 
-  // Event path only fires the notification on the idle/working -> blocked flip;
-  // the manual `notify` action skips this gate for testing.
-  if (ev && ev.agent_status !== "blocked") return;
+  // Event path fires on the flip to `blocked`, and to `done` when the user opted
+  // in; the manual `notify` action skips this gate for testing.
+  const isDone = ev?.agent_status === "done";
+  if (ev && ev.agent_status !== "blocked" && !(isDone && cfg.notify_done)) return;
 
   const agent = ev?.display_agent || ev?.agent || ctx?.pane?.agent || "agent";
   const topic = String(ev?.title || "").replace(/[\x00-\x1f\x7f]/g, " ").trim();
@@ -242,13 +245,17 @@ function main() {
     return;
   }
 
-  // "visible" = the current screen -- the approval UI is on it by definition.
-  const screen = run(["pane", "read", paneId, "--source", "visible", "--lines", PANE_READ_LINES]);
-  const approval = parseApproval(screen);
+  // A finished agent has no prompt to parse and nothing to answer: report the
+  // topic and let the click take the user there.
+  // "visible" = the current screen -- an approval UI is on it by definition.
+  const approval = isDone
+    ? null
+    : parseApproval(run(["pane", "read", paneId, "--source", "visible", "--lines", PANE_READ_LINES]));
 
-  const message =
-    (approval?.context.length ? approval.context.join("\n") : "") ||
-    approval?.question || topic || "Waiting for your answer";
+  const message = isDone
+    ? topic || "Finished"
+    : (approval?.context.length ? approval.context.join("\n") : "") ||
+      approval?.question || topic || "Waiting for your answer";
 
   const args = [
     "--title", "Herdr",
@@ -256,7 +263,10 @@ function main() {
     "--timeout", String(cfg.timeout),
     "--group", paneId, // replaces a stale notification for the same pane
   ];
-  args.push("--subtitle", heading || `${agent} needs input`);
+  // A finished agent's message is just its topic, so without this the
+  // notification looks identical to a prompt waiting for an answer.
+  const state = isDone ? "finished" : "needs input";
+  args.push("--subtitle", heading ? (isDone ? `${heading} — finished` : heading) : `${agent} ${state}`);
   if (HAS_BUNDLE) args.push("--sender", SENDER);
   if (existsSync(iconPath)) args.push("--app-icon", iconPath);
   if (cfg.sound) args.push("--sound", cfg.sound);

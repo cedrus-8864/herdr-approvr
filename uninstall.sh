@@ -28,4 +28,10 @@ Two things this script cannot do for you:
   * Your plugin config still exists. Remove it with:
       rm -rf "$(herdr plugin config-dir cedrus.approvr)"
     (run it before uninstalling the plugin, while the id still resolves)
+
+If ANOTHER copy of HerdrApprovr.app exists (e.g. a GitHub-managed install next
+to this dev checkout), unregistering this one can orphan the notification
+authorization both copies share. Re-register the surviving copy:
+  lsregister -f <path-to-other>/assets/HerdrApprovr.app
+(or just run its build-app.sh again).
 EOF

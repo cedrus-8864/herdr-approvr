@@ -24,35 +24,49 @@ pane for you. No need to hunt for the right tab.
   unzip -o /tmp/alerter.zip -d ~/.local/bin && chmod +x ~/.local/bin/alerter
   ```
 
-Then build the notification app bundle:
-
-```sh
-./build-app.sh
-```
-
-This wraps `alerter` in `assets/HerdrApprovr.app` and registers it with Launch
-Services. `alerter` impersonates `com.apple.Terminal` unless told otherwise, so
-the plugin passes `--sender dev.cedrus.herdr-approvr` to claim that bundle
-instead — without it, the notifications land under **Terminal** and you cannot
-set their alert style separately.
-
-After the first notification, set **Herdr Approvr** to **Alerts** in System
-Settings → Notifications, so the notification waits for you instead of sliding
-away after a few seconds.
-
 ## Install
 
 ```sh
 herdr plugin install cedrus-8864/herdr-approvr
 ```
 
-Local development:
+Install runs `build-app.sh`, which wraps `alerter` in
+`assets/HerdrApprovr.app` and registers it with Launch Services. That bundle is
+not cosmetic: `alerter` impersonates `com.apple.Terminal` unless told otherwise,
+so without it the notifications land under **Terminal**, where you cannot set
+their alert style and the buttons disappear with the banner. The plugin passes
+`--sender dev.cedrus.herdr-approvr` to claim the bundle instead.
+
+Local development — `herdr plugin link` skips build commands, so build by hand:
 
 ```sh
 git clone https://github.com/cedrus-8864/herdr-approvr
-herdr plugin link ./herdr-approvr
-herdr server reload-config
+cd herdr-approvr && ./build-app.sh
+herdr plugin link . && herdr server reload-config
 ```
+
+### After installing
+
+1. Trigger one notification, then set **Herdr Approvr** to **Alerts** in System
+   Settings → Notifications. As a Banner it slides away in seconds and the
+   buttons go with it.
+2. If your `~/.config/herdr/config.toml` has `[ui.toast] delivery = "system"`,
+   herdr posts its own buttonless notification for the same blocked agent and
+   you get two. Set it to `"herdr"` to keep the in-app toast and leave desktop
+   notifications to this plugin. (The plugin notes this in its log rather than
+   editing your config.)
+
+## Uninstall
+
+```sh
+./uninstall.sh                 # unregister + delete the .app bundle
+herdr plugin uninstall cedrus.approvr
+```
+
+Run them in that order: uninstalling a GitHub-managed plugin removes the
+checkout, taking `uninstall.sh` with it. The **Herdr Approvr** row in System
+Settings outlives the bundle — macOS prunes it on its own schedule and offers no
+command to remove one entry.
 
 ## How it works
 

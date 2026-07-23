@@ -5,6 +5,13 @@ min_herdr_version = "0.7.0"
 description = "Answer agent permission prompts straight from a macOS notification with real buttons (via alerter)."
 platforms = ["macos"]
 
+# Wrap alerter in our own .app bundle. Without it macOS files the notifications
+# under Terminal, so their alert style cannot be set and the buttons vanish with
+# the banner. Fatal on failure: a silent fallback would ship the broken UX.
+[[build]]
+command = ["./build-app.sh"]
+platforms = ["macos"]
+
 # Manual trigger for testing the notification UI on the focused pane:
 #   herdr plugin action invoke cedrus.approvr.notify
 [[actions]]

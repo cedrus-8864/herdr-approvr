@@ -172,6 +172,23 @@ function focusPane(paneId) {
   activateTerminal();
 }
 
+// herdr can post its own system notification for the same blocked agent, which
+// then sits next to ours saying the same thing without buttons. We do not touch
+// the user's global config, but an unexplained duplicate is worse than a hint.
+function warnIfHerdrAlsoNotifies() {
+  const home = process.env.HOME;
+  if (!home) return;
+  let text;
+  try {
+    text = readFileSync(join(home, ".config", "herdr", "config.toml"), "utf8");
+  } catch {
+    return;
+  }
+  if (/^\s*delivery\s*=\s*["']system["']/m.test(text)) {
+    console.log('note: herdr [ui.toast] delivery = "system" also posts a notification for this event; set it to "herdr" to keep only ours');
+  }
+}
+
 // You are "looking at" the pane when it is the focused pane in herdr *and* the
 // terminal is the frontmost app -- then herdr's own in-app toast is enough.
 function userIsWatching(pane) {
@@ -245,6 +262,7 @@ function main() {
   if (cfg.sound) args.push("--sound", cfg.sound);
   if (approval) args.push("--actions", approval.options.map((o) => buttonLabel(o.label)).join(","));
 
+  warnIfHerdrAlsoNotifies();
   const r = spawnSync(ALERTER, args, { encoding: "utf8" });
   if (r.error) throw new Error(`alerter not found -- install it from https://github.com/vjeantet/alerter`);
   const choice = (r.stdout || "").trim();

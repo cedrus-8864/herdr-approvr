@@ -96,7 +96,9 @@ function stillBlocked(paneId) {
 }
 
 function main() {
-  const ev = JSON.parse(process.env.HERDR_PLUGIN_EVENT_JSON || "null");
+  // Event payload is wrapped: {"event": "...", "data": {pane_id, agent_status, ...}}
+  const rawEv = JSON.parse(process.env.HERDR_PLUGIN_EVENT_JSON || "null");
+  const ev = rawEv?.data ?? rawEv;
   const ctx = JSON.parse(process.env.HERDR_PLUGIN_CONTEXT_JSON || "null");
   const paneId = ev?.pane_id || ctx?.pane?.pane_id || process.env.HERDR_PANE_ID;
   if (!paneId) return;

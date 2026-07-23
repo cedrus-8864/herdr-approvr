@@ -5,7 +5,7 @@ version = "0.3.0"
 # unverified -- and without the bundle the notifications silently degrade to
 # Terminal's identity. 0.7.5 is what this was actually tested against.
 min_herdr_version = "0.7.5"
-description = "Answer agent permission prompts straight from a macOS notification with real buttons (via alerter)."
+description = "Answer agent permission prompts straight from a macOS notification with real buttons. Single Swift binary on UNUserNotificationCenter."
 platforms = ["macos"]
 
 # Wrap alerter in our own .app bundle. Without it macOS files the notifications

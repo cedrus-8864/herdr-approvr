@@ -11,6 +11,9 @@ and the answer is typed into the right pane for you.
   <img src="docs/options.png" width="560" alt="The Options dropdown listing Show, Yes, Yes-and-don't-ask-again, and No">
 </p>
 
+A single Swift binary on `UNUserNotificationCenter` — no runtime, no external
+notifier, nothing waiting in the background.
+
 - **Click an option** → its digit is typed into the pane, after re-checking the
   pane is still blocked (answering in the terminal never double-submits)
 - **Click the body / Show** → jump to the pane, across workspaces, bringing the
@@ -47,7 +50,7 @@ Then, once:
 <details>
 <summary>Local development (plugin link)</summary>
 
-`herdr plugin link` skips build commands, so build the wrapper by hand:
+`herdr plugin link` skips build commands, so compile the notifier by hand:
 
 ```sh
 git clone https://github.com/cedrus-8864/herdr-approvr
@@ -63,7 +66,6 @@ Optional — `config.toml` in `herdr plugin config-dir cedrus.approvr`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `timeout` | `120` | Seconds the notification waits for a click. |
 | `sound` | `""` | Sound name (`"Ping"`, `"Glass"`, …); empty is silent. |
 | `suppress_when_focused` | `true` | Stay quiet when you're already looking at the pane. |
 | `notify_done` | `false` | Also notify when an agent finishes (no buttons; click jumps to the pane). |
@@ -111,7 +113,7 @@ appended to `~/Library/Logs/HerdrApprovr.log`.
 ## Uninstall
 
 ```sh
-./uninstall.sh                          # unregister + delete the .app wrapper
+./uninstall.sh                          # unregister + delete the .app bundle
 herdr plugin uninstall cedrus.approvr
 ```
 

@@ -40,8 +40,8 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>LSUIElement</key><true/>
-  <key>LSMinimumSystemVersion</key><string>10.14</string>
-  <key>NSUserNotificationAlertStyle</key><string>alert</string>
+  <!-- Swift Regex (bare literals in notifier.swift) needs the macOS 13 runtime. -->
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
 </dict>
 </plist>
 PLIST

@@ -17,7 +17,7 @@ suppress_when_focused = true
 # identifier; this template lets you say it in your own terms.
 #
 # Tokens (unknown tokens are left as-is; a "·" left dangling by an empty token
-# is trimmed automatically):
+# is trimmed automatically; an empty format falls back to the default):
 #   {workspace}  the workspace label
 #   {agent}      the agent, cased for reading (e.g. "Claude", "Codex", "Hermes")
 #   {topic}      the agent's live topic (what it's working on)

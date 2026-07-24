@@ -112,9 +112,9 @@ func loadConfig() -> Config {
 // Subtitle formatting
 // ---------------------------------------------------------------------------
 
-// herdr reports agent ids in lower case ("claude", "codex"). Present them the
-// way the user reads them in the tab bar: a known-name map for the ones whose
-// casing isn't a plain capitalization, capitalize-first for everything else.
+// herdr reports agent ids in lower case ("claude", "codex"). This map is the
+// single place to teach the plugin an agent's display name; capitalize-first is
+// only the fallback for ids not yet listed. Add new agents here as they appear.
 let agentDisplayNames: [String: String] = [
     "claude": "Claude", "codex": "Codex", "hermes": "Hermes", "cursor": "Cursor",
     "aider": "Aider", "gemini": "Gemini", "copilot": "Copilot", "amp": "Amp",
@@ -128,24 +128,25 @@ func prettyAgent(_ raw: String) -> String {
     return key.prefix(1).uppercased() + key.dropFirst()
 }
 
-// Substitute {token}s from `tokens`; unknown tokens are left literal. Then tidy:
-// an empty token can strand a separator ("{workspace} · {agent}" with no
-// workspace -> " · Claude"), so collapse whitespace and trim stray leading /
-// trailing separator punctuation.
+// Substitute {token}s from `tokens`; unknown tokens are left literal. Then tidy
+// what empty tokens leave behind: collapse whitespace, collapse a separator
+// repeated across a gap ("herdr · · Fix" -> "herdr · Fix"), and trim separators
+// stranded at either end. Order matters: whitespace first so repeats are
+// uniformly spaced, repeats before trimming so an end-run of separators shrinks
+// to one char the trim then removes.
+//
+// The trim set is decorative separators only. `-` and `/` stay out of it: they
+// occur inside real content ("my-app-", "a/b") and trimming them would rewrite
+// the user's data, not the template's punctuation.
 func applyFormat(_ format: String, _ tokens: [String: String]) -> String {
-    var substituted = format
+    var result = format
     for (key, value) in tokens {
-        substituted = substituted.replacingOccurrences(of: "{\(key)}", with: value)
+        result = result.replacingOccurrences(of: "{\(key)}", with: value)
     }
-    var result = substituted.replacingOccurrences(
-        of: #"\s+"#, with: " ", options: .regularExpression)
-    // Drop separators left dangling at either end by an empty token.
-    let strays = CharacterSet(charactersIn: " ·—–-•|:/")
-    result = result.trimmingCharacters(in: strays)
-    // Collapse a doubled separator left in the middle, e.g. "· ·".
+    result = result.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
     result = result.replacingOccurrences(
-        of: #"\s*([·—–•|])\s*\1+"#, with: " $1 ", options: .regularExpression)
-    return result
+        of: #"([·—–•|])( \1)+"#, with: "$1", options: .regularExpression)
+    return result.trimmingCharacters(in: CharacterSet(charactersIn: " ·—–•|:"))
 }
 
 // ---------------------------------------------------------------------------
@@ -579,6 +580,19 @@ func selfTest() -> Never {
     let noWs = ["workspace": "", "agent": "Claude", "topic": "", "cwd": "", "tab": "1"]
     expect(applyFormat("{workspace} · {agent}", noWs) == "Claude", "format: empty workspace trims separator")
     expect(applyFormat("{agent} — {cwd}", noWs) == "Claude", "format: empty cwd trims separator")
+    // A separator repeated across a gap collapses without doubling spaces, and
+    // strands at the start disappear entirely.
+    let midGap = ["workspace": "herdr", "agent": "", "topic": "Fix bug", "cwd": "", "tab": ""]
+    expect(applyFormat("{workspace} · {agent} · {topic}", midGap) == "herdr · Fix bug",
+           "format: doubled middle separator collapses cleanly")
+    let twoGaps = ["workspace": "", "agent": "", "topic": "Fix bug", "cwd": "", "tab": ""]
+    expect(applyFormat("{workspace} · {agent} · {topic}", twoGaps) == "Fix bug",
+           "format: leading separator run removed")
+    // Trimming targets template separators, never characters inside content.
+    let dashCwd = ["workspace": "", "agent": "", "topic": "", "cwd": "my-app-", "tab": ""]
+    expect(applyFormat("{cwd}", dashCwd) == "my-app-", "format: content trailing dash preserved")
+    let question = ["workspace": "", "agent": "Claude", "topic": "Is it done?", "cwd": "", "tab": ""]
+    expect(applyFormat("{agent}: {topic}", question) == "Claude: Is it done?", "format: content question mark preserved")
 
     if failures == 0 { print("self-test OK"); exit(0) }
     exit(1)

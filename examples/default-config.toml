@@ -12,6 +12,24 @@ sound = ""
 # frontmost app -- herdr's own in-app toast already tells you in that case.
 suppress_when_focused = true
 
+# Subtitle line of the notification -- names *which* session is asking. Herdr
+# labels tabs "1", "2", "3" by default, so the raw tab name is a poor
+# identifier; this template lets you say it in your own terms.
+#
+# Tokens (unknown tokens are left as-is; a "·" left dangling by an empty token
+# is trimmed automatically):
+#   {workspace}  the workspace label
+#   {agent}      the agent, cased for reading (e.g. "Claude", "Codex", "Hermes")
+#   {topic}      the agent's live topic (what it's working on)
+#   {cwd}        basename of the pane's working directory (e.g. "my-project")
+#   {tab}        herdr's tab label (often just a number)
+#
+# Examples:
+#   "{workspace} · {agent}"   -> "herdr · Claude"          (default)
+#   "{agent} — {cwd}"          -> "Claude — my-project"
+#   "{agent}: {topic}"         -> "Claude: Fix the parser bug"
+subtitle_format = "{workspace} · {agent}"
+
 # Also notify when an agent finishes, not just when it needs an answer. There is
 # nothing to answer, so that notification has no buttons; clicking it jumps to
 # the pane. Turn this on if you set herdr's [ui.toast] delivery = "herdr" and

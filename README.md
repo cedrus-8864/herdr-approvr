@@ -69,6 +69,30 @@ Optional — `config.toml` in `herdr plugin config-dir cedrus.approvr`.
 | `sound` | `""` | Sound name (`"Ping"`, `"Glass"`, …); empty is silent. |
 | `suppress_when_focused` | `true` | Stay quiet when you're already looking at the pane. |
 | `notify_done` | `false` | Also notify when an agent finishes (no buttons; click jumps to the pane). |
+| `subtitle_format` | `"{workspace} · {agent}"` | Template for the subtitle line — see below. |
+
+### Subtitle template
+
+The notification's second line says *which* session is asking. Because herdr
+names tabs `1`, `2`, `3` by default, the raw tab name is a poor identifier, so
+the subtitle is a template you control. Tokens:
+
+| Token | Meaning | Example |
+|-------|---------|---------|
+| `{workspace}` | Workspace label | `herdr` |
+| `{agent}` | Agent name, cased for reading | `Claude`, `Codex`, `Hermes` |
+| `{topic}` | The agent's live topic (what it's working on) | `Fix the parser bug` |
+| `{cwd}` | Basename of the pane's working directory | `my-project` |
+| `{tab}` | herdr's tab label | `1` |
+
+Unknown tokens are left literal. A separator left dangling by an empty token
+(e.g. `{workspace} · {agent}` when there's no workspace) is trimmed
+automatically. When an agent *finishes*, ` — finished` is appended so a
+completion never looks like a waiting prompt.
+
+```toml
+subtitle_format = "{agent}: {topic}"   # -> "Claude: Fix the parser bug"
+```
 
 **Recommended setup** — this plugin covers both notification classes, herdr
 keeps the in-app toasts:

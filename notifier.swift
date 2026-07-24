@@ -72,6 +72,11 @@ struct Config {
     var sound = ""
     var suppressWhenFocused = true
     var notifyDone = false
+    // Subtitle line of the notification. Herdr names tabs "1", "2", "3" by
+    // default, so the raw tab label is a poor identifier -- this template lets
+    // the user say *which* session is asking in their own terms.
+    // Tokens: {workspace} {agent} {topic} {cwd} {tab}
+    var subtitleFormat = "{workspace} · {agent}"
 }
 
 func loadConfig() -> Config {
@@ -96,10 +101,51 @@ func loadConfig() -> Config {
         case "sound": config.sound = raw
         case "suppress_when_focused": config.suppressWhenFocused = raw != "false"
         case "notify_done": config.notifyDone = raw == "true"
+        case "subtitle_format": if !raw.isEmpty { config.subtitleFormat = raw }
         default: break
         }
     }
     return config
+}
+
+// ---------------------------------------------------------------------------
+// Subtitle formatting
+// ---------------------------------------------------------------------------
+
+// herdr reports agent ids in lower case ("claude", "codex"). Present them the
+// way the user reads them in the tab bar: a known-name map for the ones whose
+// casing isn't a plain capitalization, capitalize-first for everything else.
+let agentDisplayNames: [String: String] = [
+    "claude": "Claude", "codex": "Codex", "hermes": "Hermes", "cursor": "Cursor",
+    "aider": "Aider", "gemini": "Gemini", "copilot": "Copilot", "amp": "Amp",
+    "goose": "Goose", "opencode": "OpenCode", "openai": "OpenAI", "chatgpt": "ChatGPT",
+]
+
+func prettyAgent(_ raw: String) -> String {
+    let key = raw.trimmingCharacters(in: .whitespaces)
+    if key.isEmpty { return "" }
+    if let known = agentDisplayNames[key.lowercased()] { return known }
+    return key.prefix(1).uppercased() + key.dropFirst()
+}
+
+// Substitute {token}s from `tokens`; unknown tokens are left literal. Then tidy:
+// an empty token can strand a separator ("{workspace} · {agent}" with no
+// workspace -> " · Claude"), so collapse whitespace and trim stray leading /
+// trailing separator punctuation.
+func applyFormat(_ format: String, _ tokens: [String: String]) -> String {
+    var substituted = format
+    for (key, value) in tokens {
+        substituted = substituted.replacingOccurrences(of: "{\(key)}", with: value)
+    }
+    var result = substituted.replacingOccurrences(
+        of: #"\s+"#, with: " ", options: .regularExpression)
+    // Drop separators left dangling at either end by an empty token.
+    let strays = CharacterSet(charactersIn: " ·—–-•|:/")
+    result = result.trimmingCharacters(in: strays)
+    // Collapse a doubled separator left in the middle, e.g. "· ·".
+    result = result.replacingOccurrences(
+        of: #"\s*([·—–•|])\s*\1+"#, with: " $1 ", options: .regularExpression)
+    return result
 }
 
 // ---------------------------------------------------------------------------
@@ -287,16 +333,16 @@ func handleEvent() {
         .components(separatedBy: .controlCharacters).joined(separator: " ")
         .trimmingCharacters(in: .whitespaces)
 
-    // Title = the tab's label (what the user sees in the tab bar), so the
-    // notification says *which* session is asking.
+    // Pane record carries the identifiers the subtitle tokens draw on
+    // (tab_id, workspace_id, cwd) plus the focus check below.
     let pane = (herdrJSON(herdr, ["pane", "get", paneId])?["result"] as? [String: Any])?["pane"] as? [String: Any]
-    var heading = ""
+    var tabLabel = ""
     if let tabId = pane?["tab_id"] as? String,
        let tab = (herdrJSON(herdr, ["tab", "get", tabId])?["result"] as? [String: Any])?["tab"] as? [String: Any],
        let label = tab["label"] as? String {
-        heading = label
+        tabLabel = label
     } else if let label = pane?["label"] as? String {
-        heading = label
+        tabLabel = label
     }
 
     if config.suppressWhenFocused && userIsWatching(pane) {
@@ -320,11 +366,30 @@ func handleEvent() {
         message = approval.question
     }
 
-    // A finished agent's message is just its topic, so without this the
-    // notification looks identical to a prompt waiting for an answer.
-    let subtitle = heading.isEmpty
-        ? "\(agent) \(isDone ? "finished" : "needs input")"
-        : (isDone ? "\(heading) — finished" : heading)
+    // Subtitle: a user-chosen template naming which session is asking. Herdr's
+    // default tab names ("1", "2", ...) make the raw tab label a poor
+    // identifier, hence the default "{workspace} · {agent}". Workspace is looked
+    // up lazily -- only when the template actually asks for it.
+    var workspace = ""
+    if config.subtitleFormat.contains("{workspace}"),
+       let wsId = pane?["workspace_id"] as? String {
+        workspace = ((herdrJSON(herdr, ["workspace", "get", wsId])?["result"] as? [String: Any])?["workspace"] as? [String: Any])?["label"] as? String ?? ""
+    }
+    let cwd = (pane?["cwd"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
+    var subtitle = applyFormat(config.subtitleFormat, [
+        "workspace": workspace,
+        "agent": prettyAgent(agent),
+        "topic": topic,
+        "cwd": cwd,
+        "tab": tabLabel,
+    ])
+    // A finished agent's message is just its topic, so preserve the
+    // finished/needs-input distinction the template itself may not carry.
+    if subtitle.isEmpty {
+        subtitle = "\(prettyAgent(agent)) \(isDone ? "finished" : "needs input")"
+    } else if isDone {
+        subtitle += " — finished"
+    }
 
     warnIfHerdrAlsoNotifies()
     post(title: "Herdr", subtitle: subtitle, message: message, group: paneId,
@@ -497,6 +562,23 @@ func selfTest() -> Never {
         expect(result.context.count == 7, "long command: 7 context lines")
         expect(!result.context.contains { $0.contains("Baked") }, "long command: chrome stops context")
     } else { expect(false, "long command detected") }
+
+    // Agent name casing.
+    expect(prettyAgent("claude") == "Claude", "prettyAgent: known lower-case")
+    expect(prettyAgent("CODEX") == "Codex", "prettyAgent: known upper-case")
+    expect(prettyAgent("mytool") == "Mytool", "prettyAgent: unknown capitalized")
+    expect(prettyAgent("") == "", "prettyAgent: empty stays empty")
+
+    // Subtitle templates.
+    let tok = ["workspace": "herdr", "agent": "Claude", "topic": "Fix the parser bug",
+               "cwd": "my-project", "tab": "1"]
+    expect(applyFormat("{workspace} · {agent}", tok) == "herdr · Claude", "format: default")
+    expect(applyFormat("{agent}: {topic}", tok) == "Claude: Fix the parser bug", "format: agent+topic")
+    expect(applyFormat("{unknown}", tok) == "{unknown}", "format: unknown left literal")
+    // An empty token must not strand its separator.
+    let noWs = ["workspace": "", "agent": "Claude", "topic": "", "cwd": "", "tab": "1"]
+    expect(applyFormat("{workspace} · {agent}", noWs) == "Claude", "format: empty workspace trims separator")
+    expect(applyFormat("{agent} — {cwd}", noWs) == "Claude", "format: empty cwd trims separator")
 
     if failures == 0 { print("self-test OK"); exit(0) }
     exit(1)

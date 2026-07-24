@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in */notifier.swift) swift format --in-place \"$f\" 2>/dev/null; out=$(\"$(dirname \"$f\")/build-app.sh\" 2>&1) || { echo \"$out\" >&2; exit 2; };; esac; }",
+            "timeout": 120,
+            "statusMessage": "Formatting and rebuilding HerdrPromptReply.app..."
+          }
+        ]
+      }
+    ]
+  }
+}

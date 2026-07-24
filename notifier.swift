@@ -236,13 +236,14 @@ func buttonLabel(_ label: String) -> String {
 
 let center = UNUserNotificationCenter.current()
 
-// `group` is the pane id and becomes the threadIdentifier (visual grouping and
-// the unit pane-focus withdrawal works on). `identifier` is the request id:
-// prompts use the pane id itself so a newer prompt replaces the older one;
-// finished notifications get a unique id so their delayed remover can never
-// touch anything else.
-func post(title: String, subtitle: String, message: String, group: String, identifier: String,
-          sound: String, paneId: String, herdr: String, actions: [(digit: String, label: String)]) {
+// `group` is the pane id: threadIdentifier AND the request id, so any newer
+// notification for the pane replaces the older one. `stamp` marks a finished
+// notification so its delayed remover can verify it is still the same instance
+// before removing -- a request id of its own would be cleaner, but usernoted
+// then never delivers the body-click response (verified by A/B on macOS 26.5).
+func post(title: String, subtitle: String, message: String, group: String, sound: String,
+          paneId: String, herdr: String, stamp: String? = nil,
+          actions: [(digit: String, label: String)]) {
     let semaphore = DispatchSemaphore(value: 0)
     var authorized = false
     center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
@@ -260,34 +261,38 @@ func post(title: String, subtitle: String, message: String, group: String, ident
     if !subtitle.isEmpty { content.subtitle = subtitle }
     content.body = message
     content.threadIdentifier = group
-    content.userInfo = ["pane_id": paneId, "herdr": herdr]
+    var userInfo: [String: Any] = ["pane_id": paneId, "herdr": herdr]
+    if let stamp { userInfo["stamp"] = stamp }
+    content.userInfo = userInfo
     if !sound.isEmpty { content.sound = UNNotificationSound(named: UNNotificationSoundName(sound)) }
 
-    if !actions.isEmpty {
-        let notificationActions = actions.map {
-            UNNotificationAction(identifier: $0.digit, title: buttonLabel($0.label), options: [])
-        }
-        let category = UNNotificationCategory(
-            identifier: group, actions: notificationActions, intentIdentifiers: [],
-            options: [.customDismissAction]
-        )
-        center.getNotificationCategories { existing in
-            var categories = existing.filter { $0.identifier != group }
-            categories.insert(category)
-            center.setNotificationCategories(categories)
-            semaphore.signal()
-        }
-        semaphore.wait()
-        content.categoryIdentifier = group
+    // Every notification gets a category, even with no actions: usernoted does
+    // not deliver the default-action (body click) response for category-less
+    // notifications -- the responder launches and then hears nothing. Found the
+    // hard way; actions-bearing prompts always worked, buttonless ones never.
+    let notificationActions = actions.map {
+        UNNotificationAction(identifier: $0.digit, title: buttonLabel($0.label), options: [])
     }
+    let category = UNNotificationCategory(
+        identifier: group, actions: notificationActions, intentIdentifiers: [],
+        options: [.customDismissAction]
+    )
+    center.getNotificationCategories { existing in
+        var categories = existing.filter { $0.identifier != group }
+        categories.insert(category)
+        center.setNotificationCategories(categories)
+        semaphore.signal()
+    }
+    semaphore.wait()
+    content.categoryIdentifier = group
 
-    let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+    let request = UNNotificationRequest(identifier: group, content: content, trigger: nil)
     center.add(request) { error in
         if let error { FileHandle.standardError.write("post failed: \(error)\n".data(using: .utf8)!) }
         semaphore.signal()
     }
     semaphore.wait()
-    print("posted: \(identifier)")
+    print("posted: \(group)")
 }
 
 func remove(_ identifier: String) {
@@ -297,32 +302,35 @@ func remove(_ identifier: String) {
     Thread.sleep(forTimeInterval: 0.3)
 }
 
-// Withdraw everything a pane has on screen -- prompts (id == pane id) and
-// finished notifications (unique ids) share the pane's threadIdentifier.
-// `except` lets a fresh prompt clear stale finished notifications without
-// touching itself.
-func removeThread(_ thread: String, except keep: String? = nil) {
+// Remove the pane's notification only if it is still the instance carrying
+// `stamp` -- the delayed remover for a finished notification must leave alone
+// whatever replaced it (a prompt, or a newer finished notification) inside the
+// delay window.
+func removeIfStamped(_ identifier: String, stamp: String) {
     let semaphore = DispatchSemaphore(value: 0)
-    var identifiers: [String] = []
+    var matches = false
     center.getDeliveredNotifications { delivered in
-        identifiers = delivered
-            .filter { $0.request.content.threadIdentifier == thread && $0.request.identifier != keep }
-            .map { $0.request.identifier }
+        matches = delivered.contains {
+            $0.request.identifier == identifier &&
+            ($0.request.content.userInfo["stamp"] as? String) == stamp
+        }
         semaphore.signal()
     }
     semaphore.wait()
-    if !identifiers.isEmpty { center.removeDeliveredNotifications(withIdentifiers: identifiers) }
-    if keep != thread { center.removePendingNotificationRequests(withIdentifiers: [thread]) }
-    Thread.sleep(forTimeInterval: 0.3)
+    if matches { remove(identifier) }
 }
 
-// Fire-and-forget child that outlives this process; used to expire a finished
-// notification after `done_dismiss_seconds`.
-func spawnDetached(_ arguments: [String]) {
+// Fire-and-forget expiry for a finished notification. The sleeper MUST be
+// /bin/sh, not another instance of this bundle: while a bundle process is
+// alive, usernoted routes a click's response to it instead of launching the
+// responder -- and the sleeper has no delegate, so the click would vanish.
+// (Found by A/B: clicks delivered fine exactly when no remover was pending.)
+func spawnDetachedExpiry(seconds: Int, identifier: String, stamp: String) {
     let process = Process()
     let selfPath = Bundle.main.executablePath ?? CommandLine.arguments[0]
-    process.executableURL = URL(fileURLWithPath: selfPath)
-    process.arguments = arguments
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", "sleep \(seconds); exec \"$0\" --remove \"$1\" --stamp \"$2\"",
+                         selfPath, identifier, stamp]
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
     try? process.run()
@@ -356,11 +364,10 @@ func handleEvent() {
         if !resolved.isEmpty { herdr = resolved }
     }
 
-    // Arriving at the pane answers the notification's question: withdraw
-    // everything it has on screen (the prompt and any finished notifications
-    // share the pane's thread) rather than leave stale entries behind.
+    // Arriving at the pane answers the notification's question: withdraw it
+    // rather than leave a stale entry on screen.
     if env["HERDR_PLUGIN_EVENT"] == "pane.focused" {
-        removeThread(paneId)
+        remove(paneId)
         return
     }
 
@@ -437,19 +444,16 @@ func handleEvent() {
     }
 
     warnIfHerdrAlsoNotifies()
-    // Prompts reuse the pane id so a newer prompt replaces the older one.
-    // Finished notifications get a unique id: their delayed remover must never
-    // be able to hit a prompt that took over the pane in the meantime.
-    let identifier = isDone ? "\(paneId).done.\(Int(Date().timeIntervalSince1970 * 1000))" : paneId
-    if !isDone {
-        // A fresh prompt supersedes any finished notification still on screen.
-        removeThread(paneId, except: paneId)
-    }
+    // One request id per pane, so any newer notification replaces the older
+    // one. A finished notification carries a stamp its delayed remover must
+    // re-find before removing -- that is what keeps the remover off a prompt
+    // that takes over the pane inside the delay window.
+    let stamp = isDone ? String(Int(Date().timeIntervalSince1970 * 1000)) : nil
     post(title: "Herdr", subtitle: subtitle, message: message, group: paneId,
-         identifier: identifier, sound: config.sound, paneId: paneId, herdr: herdr,
+         sound: config.sound, paneId: paneId, herdr: herdr, stamp: stamp,
          actions: approval?.options ?? [])
-    if isDone && config.doneDismissSeconds > 0 {
-        spawnDetached(["--remove", identifier, "--delay", String(config.doneDismissSeconds)])
+    if let stamp, config.doneDismissSeconds > 0 {
+        spawnDetachedExpiry(seconds: config.doneDismissSeconds, identifier: paneId, stamp: stamp)
     }
 }
 
@@ -688,15 +692,20 @@ if options.list {
 }
 if let removeId = options.remove {
     // --delay is how a finished notification expires: post spawns a detached
-    // `--remove <unique-id> --delay N` child that sleeps out the display time.
+    // `--remove <pane-id> --delay N --stamp S` child that sleeps out the
+    // display time, then removes only if the stamp still matches.
     if options.delay > 0 { Thread.sleep(forTimeInterval: TimeInterval(options.delay)) }
-    remove(removeId)
+    if let stamp = options.stamp {
+        removeIfStamped(removeId, stamp: stamp)
+    } else {
+        remove(removeId)
+    }
     exit(0)
 }
 if !options.title.isEmpty {
     post(title: options.title, subtitle: options.subtitle, message: options.message,
-         group: options.group, identifier: options.group, sound: options.sound,
-         paneId: options.paneId, herdr: options.herdr, actions: options.actions)
+         group: options.group, sound: options.sound, paneId: options.paneId,
+         herdr: options.herdr, actions: options.actions)
     exit(0)
 }
 
@@ -707,7 +716,7 @@ let responder = Responder()
 center.delegate = responder
 let app = NSApplication.shared
 app.delegate = responder
-log("responder: launched, waiting for response delivery")
+log("responder: launched, exe=\(Bundle.main.executablePath ?? "?") bundleId=\(Bundle.main.bundleIdentifier ?? "?")")
 DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
     log("responder: nothing delivered within 15s, exiting")
     NSApp.terminate(nil)
@@ -730,6 +739,7 @@ struct Options {
     var actions: [(digit: String, label: String)] = []
     var remove: String? = nil
     var delay = 0
+    var stamp: String? = nil
     var list = false
     var status = false
     var selfTest = false
@@ -754,6 +764,7 @@ func parseArguments() -> Options {
             }
         case "--remove": options.remove = iterator.next()
         case "--delay": options.delay = max(0, Int(iterator.next() ?? "0") ?? 0)
+        case "--stamp": options.stamp = iterator.next()
         case "--list": options.list = true
         case "--status": options.status = true
         case "--self-test": options.selfTest = true

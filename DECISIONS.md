@@ -70,3 +70,24 @@ bundle `HerdrPromptReply.app` / `dev.cedrus.herdr-prompt-reply`, log
   change for every user.
 - Historical ADR entries keep their original wording; only live references were
   renamed.
+
+## 2026-07-24 — usernoted delivery constraints reshape the dismiss design
+
+**Context:** Body clicks on finished notifications launched the responder but
+the response never arrived. Isolated by A/B on macOS 26.5 to two usernoted
+behaviors, neither documented:
+
+1. A notification without a registered category never delivers its
+   default-action (body click) response. Prompts always worked because their
+   action list came with a category; buttonless notifications did not.
+2. While any process of the bundle is alive, the click response is routed to it
+   instead of a freshly launched instance. The auto-dismiss sleeper was such a
+   process — delegate-less — so clicks inside the dismiss window vanished.
+
+**Decision:** Every notification now registers a category (empty actions
+allowed). The finished notification reuses the pane id as request id (replacement
+semantics return) and carries a millisecond stamp in userInfo; expiry is a
+detached `/bin/sh -c 'sleep N; exec notifier --remove <pane> --stamp <ms>'`, so
+the bundle binary never lingers, and removal happens only if the stamp still
+matches — which is what keeps the remover off a prompt that took over the pane
+inside the window (re-verified by the trap test).

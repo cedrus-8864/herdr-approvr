@@ -91,9 +91,9 @@ is the tab's *label*, where autolabel's `{n}` is the tab's position number.
 
 Unknown tokens are left literal. A separator left dangling by an empty token
 (e.g. `{workspace} · {agent}` when there's no workspace) is trimmed
-automatically. An empty `subtitle_format` falls back to the default rather than
-hiding the line. When an agent *finishes*, ` — finished` is appended so a
-completion never looks like a waiting prompt.
+automatically. `subtitle_format = ""` gives the minimal form: just
+`Claude needs input` / `Claude finished`. When an agent *finishes*,
+` — finished` is appended so a completion never looks like a waiting prompt.
 
 ```toml
 subtitle_format = "{agent}: {topic}"   # -> "Claude: Fix the parser bug"

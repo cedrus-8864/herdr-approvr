@@ -1,4 +1,4 @@
-# Approvr
+# Prompt Reply
 
 Answer [herdr](https://herdr.dev) agent permission prompts straight from a
 macOS notification. When Claude Code (or any agent) stops on a *"Do you want to
@@ -28,10 +28,10 @@ have them if you have git). No other runtime: the plugin is a single Swift
 binary compiled at install.
 
 ```sh
-herdr plugin install cedrus-8864/herdr-approvr
+herdr plugin install cedrus-8864/herdr-prompt-reply
 ```
 
-The install compiles `HerdrApprovr.app`, which talks to the system's
+The install compiles `HerdrPromptReply.app`, which talks to the system's
 notification center directly (`UNUserNotificationCenter` — the supported API,
 not the deprecated one CLI notifiers ride on). Posting is fire-and-exit: when
 you click, macOS relaunches the binary to deliver your answer, so nothing sits
@@ -39,7 +39,7 @@ around waiting.
 
 Then, once:
 
-1. Trigger a notification (any permission prompt), and set **Herdr Approvr** to
+1. Trigger a notification (any permission prompt), and set **Herdr Prompt Reply** to
    **Alerts** in System Settings → Notifications — as a Banner it slides away
    in seconds, taking the buttons with it. The entry appears after the first
    notification.
@@ -53,8 +53,8 @@ Then, once:
 `herdr plugin link` skips build commands, so compile the notifier by hand:
 
 ```sh
-git clone https://github.com/cedrus-8864/herdr-approvr
-cd herdr-approvr && ./build-app.sh
+git clone https://github.com/cedrus-8864/herdr-prompt-reply
+cd herdr-prompt-reply && ./build-app.sh
 herdr plugin link . && herdr server reload-config
 ```
 
@@ -62,7 +62,7 @@ herdr plugin link . && herdr server reload-config
 
 ## Configuration
 
-Optional — `config.toml` in `herdr plugin config-dir cedrus.approvr`.
+Optional — `config.toml` in `herdr plugin config-dir cedrus.prompt-reply`.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -110,7 +110,7 @@ delivery = "herdr"
 ```
 
 ```toml
-# <herdr plugin config-dir cedrus.approvr>/config.toml
+# <herdr plugin config-dir cedrus.prompt-reply>/config.toml
 notify_done = true
 sound = "Ping"
 ```
@@ -138,13 +138,13 @@ notification whose actions carry the option digits. Clicking an action
 relaunches the binary; it re-checks the pane is still blocked, then answers
 with `pane send-keys`. On `pane.focused`, the pane's notification is withdrawn.
 Unparseable prompts still notify; clicking focuses the pane. Click outcomes are
-appended to `~/Library/Logs/HerdrApprovr.log`.
+appended to `~/Library/Logs/HerdrPromptReply.log`.
 
 ## Uninstall
 
 ```sh
 ./uninstall.sh                          # unregister + delete the .app bundle
-herdr plugin uninstall cedrus.approvr
+herdr plugin uninstall cedrus.prompt-reply
 ```
 
 In that order — uninstalling removes the checkout, and the script with it.
@@ -155,13 +155,13 @@ own schedule. Automating this needs an uninstall hook in herdr, tracked in
 ## Troubleshooting
 
 - **Buttons vanish before you can click** → the notification style is still
-  Banners; set **Herdr Approvr** to **Alerts**.
+  Banners; set **Herdr Prompt Reply** to **Alerts**.
 - **Two notifications per prompt** → herdr's own system toast is on; set
   `[ui.toast] delivery = "herdr"`.
 - **No notification at all** → the app bundle is missing; run `./build-app.sh`
-  from the plugin directory. Parser check: `assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr --self-test`.
-- Posting outcomes: `herdr plugin log list --plugin cedrus.approvr --limit 5`.
-  Click outcomes: `tail ~/Library/Logs/HerdrApprovr.log`.
+  from the plugin directory. Parser check: `assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply --self-test`.
+- Posting outcomes: `herdr plugin log list --plugin cedrus.prompt-reply --limit 5`.
+  Click outcomes: `tail ~/Library/Logs/HerdrPromptReply.log`.
 
 ## Credits
 

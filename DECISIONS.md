@@ -1,6 +1,6 @@
 # Decisions
 
-Append-only log of significant architectural decisions for herdr-approvr.
+Append-only log of significant architectural decisions for herdr-prompt-reply.
 
 ## 2026-07-23 — Configurable notification subtitle via template
 
@@ -51,3 +51,22 @@ question must not evaporate while the agent is still waiting.
   pane on post.
 - The detached child is a bounded exception to "no waiting processes": it
   sleeps N seconds and exits, and never waits on the user.
+
+## 2026-07-24 — Renamed: Approvr → Prompt Reply
+
+**Context:** "Approvr" said who acts, not what happens; "prompt reply" names the
+actual capability (answer an agent's prompt from the notification) and is
+greppable next to the sibling plugins' plain-english names.
+
+**Decision:** Full identifier sync in one move, while the plugin has no outside
+installs to break: repo `herdr-prompt-reply`, plugin id `cedrus.prompt-reply`,
+bundle `HerdrPromptReply.app` / `dev.cedrus.herdr-prompt-reply`, log
+`~/Library/Logs/HerdrPromptReply.log`. Version bumped to 0.4.0.
+
+**Notes / rationale:**
+- Changing the bundle id forfeits the notification authorization and Alerts
+  style granted to the old id — a one-time re-grant per machine. Accepted now
+  precisely because later (post-marketplace-traction) it would be a breaking
+  change for every user.
+- Historical ADR entries keep their original wording; only live references were
+  renamed.

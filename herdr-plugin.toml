@@ -1,6 +1,6 @@
-id = "cedrus.approvr"
-name = "Approvr"
-version = "0.3.0"
+id = "cedrus.prompt-reply"
+name = "Prompt Reply"
+version = "0.4.0"
 # Plugin v1 landed in 0.7.0, but whether those releases run [[build]] commands is
 # unverified -- and without the bundle the notifications silently degrade to
 # Terminal's identity. 0.7.5 is what this was actually tested against.
@@ -16,18 +16,18 @@ command = ["./build-app.sh"]
 platforms = ["macos"]
 
 # Manual trigger for testing the notification UI on the focused pane:
-#   herdr plugin action invoke cedrus.approvr.notify
+#   herdr plugin action invoke cedrus.prompt-reply.notify
 [[actions]]
 id = "notify"
 title = "Notify for this pane's prompt"
 contexts = ["pane"]
-command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]
+command = ["assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply", "handle-event"]
 
 [[events]]
 on = "pane.agent_status_changed"
-command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]
+command = ["assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply", "handle-event"]
 
 # Landing on the pane makes its notification stale -- withdraw it.
 [[events]]
 on = "pane.focused"
-command = ["assets/HerdrApprovr.app/Contents/MacOS/HerdrApprovr", "handle-event"]
+command = ["assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply", "handle-event"]

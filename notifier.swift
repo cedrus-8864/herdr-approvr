@@ -1,4 +1,4 @@
-// Herdr Approvr -- the whole plugin in one Swift binary.
+// Herdr Prompt Reply -- the whole plugin in one Swift binary.
 //
 // Modes (decided by argv):
 //   handle-event     invoked by herdr for subscribed events and the manual
@@ -15,16 +15,16 @@
 // Posting is fire-and-exit: the click context (pane id, herdr path, option
 // digits) travels inside the notification's userInfo, and the system relaunches
 // this binary to deliver the response -- no process waits for an answer.
-// Responder activity is appended to ~/Library/Logs/HerdrApprovr.log because its
+// Responder activity is appended to ~/Library/Logs/HerdrPromptReply.log because its
 // stdout goes nowhere.
 //
 // UNUserNotificationCenter only works from inside an .app bundle, which is why
-// build-app.sh compiles this straight into HerdrApprovr.app.
+// build-app.sh compiles this straight into HerdrPromptReply.app.
 
 import AppKit
 import UserNotifications
 
-let logPath = ("~/Library/Logs/HerdrApprovr.log" as NSString).expandingTildeInPath
+let logPath = ("~/Library/Logs/HerdrPromptReply.log" as NSString).expandingTildeInPath
 
 func log(_ message: String) {
     let stamp = ISO8601DateFormatter().string(from: Date())

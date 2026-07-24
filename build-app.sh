@@ -1,6 +1,6 @@
 #!/bin/sh
 # Compile the Swift notifier into an .app bundle so macOS gives our
-# notifications their own identity: a "Herdr Approvr" entry in System Settings >
+# notifications their own identity: a "Herdr Prompt Reply" entry in System Settings >
 # Notifications (set it to Alerts so the buttons stay on screen), the herdr
 # icon, and no borrowing of Terminal's notification settings.
 #
@@ -9,7 +9,7 @@
 set -eu
 
 root=$(cd "$(dirname "$0")" && pwd)
-app="$root/assets/HerdrApprovr.app"
+app="$root/assets/HerdrPromptReply.app"
 
 if ! command -v swiftc >/dev/null 2>&1; then
   echo "swiftc not found -- install the Xcode Command Line Tools: xcode-select --install" >&2
@@ -18,11 +18,11 @@ fi
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-swiftc -O -swift-version 5 -enable-bare-slash-regex "$root/notifier.swift" -o "$app/Contents/MacOS/HerdrApprovr"
+swiftc -O -swift-version 5 -enable-bare-slash-regex "$root/notifier.swift" -o "$app/Contents/MacOS/HerdrPromptReply"
 
 # The icon must be .icns for the bundle.
 if [ -f "$root/assets/herdr.icns" ]; then
-  cp "$root/assets/herdr.icns" "$app/Contents/Resources/HerdrApprovr.icns"
+  cp "$root/assets/herdr.icns" "$app/Contents/Resources/HerdrPromptReply.icns"
 fi
 
 cat > "$app/Contents/Info.plist" <<'PLIST'
@@ -30,11 +30,11 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key><string>HerdrApprovr</string>
-  <key>CFBundleIdentifier</key><string>dev.cedrus.herdr-approvr</string>
-  <key>CFBundleName</key><string>Herdr Approvr</string>
-  <key>CFBundleDisplayName</key><string>Herdr Approvr</string>
-  <key>CFBundleIconFile</key><string>HerdrApprovr</string>
+  <key>CFBundleExecutable</key><string>HerdrPromptReply</string>
+  <key>CFBundleIdentifier</key><string>dev.cedrus.herdr-prompt-reply</string>
+  <key>CFBundleName</key><string>Herdr Prompt Reply</string>
+  <key>CFBundleDisplayName</key><string>Herdr Prompt Reply</string>
+  <key>CFBundleIconFile</key><string>HerdrPromptReply</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
@@ -77,7 +77,7 @@ fi
 
 cat <<'EOF'
 
-NEXT: trigger one notification, then set "Herdr Approvr" to Alerts in
+NEXT: trigger one notification, then set "Herdr Prompt Reply" to Alerts in
 System Settings > Notifications. As a Banner it slides away in seconds and
 takes the answer buttons with it.
 EOF

@@ -1,7 +1,7 @@
-# Approvr -- configuration
+# Prompt Reply -- configuration
 #
 # Copy to your plugin config dir to customize:
-#   herdr plugin config-dir cedrus.approvr
+#   herdr plugin config-dir cedrus.prompt-reply
 #
 # All keys are optional; omitted keys use the defaults shown below.
 

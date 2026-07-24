@@ -9,8 +9,9 @@ Append-only log of significant architectural decisions for herdr-approvr.
 
 **Decision:** Added a `subtitle_format` config key (flat-TOML, same reader as the
 other keys). Default `"{workspace} · {agent}"`. Tokens: `{workspace}`, `{agent}`,
-`{topic}`, `{cwd}`, `{tab}` — the same vocabulary as the sibling `herdr-autolabel`
-plugin, so users learn one token set across both.
+`{topic}`, `{cwd}`, `{tab}` — four of five shared with the sibling
+`herdr-autolabel` plugin; the fifth differs (autolabel's `{n}` is the tab's
+position number, `{tab}` here is the tab's label).
 
 **Notes / rationale:**
 - `{agent}` is presented cased-for-reading (`Claude`, `Codex`, `Hermes`) via a

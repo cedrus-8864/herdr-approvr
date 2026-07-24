@@ -85,9 +85,14 @@ the subtitle is a template you control. Tokens:
 | `{cwd}` | Basename of the pane's working directory | `my-project` |
 | `{tab}` | herdr's tab label | `1` |
 
+`{workspace}` `{agent}` `{topic}` `{cwd}` mean the same as in
+[herdr-autolabel](https://github.com/cedrus-8864/herdr-autolabel); note `{tab}`
+is the tab's *label*, where autolabel's `{n}` is the tab's position number.
+
 Unknown tokens are left literal. A separator left dangling by an empty token
 (e.g. `{workspace} · {agent}` when there's no workspace) is trimmed
-automatically. When an agent *finishes*, ` — finished` is appended so a
+automatically. An empty `subtitle_format` falls back to the default rather than
+hiding the line. When an agent *finishes*, ` — finished` is appended so a
 completion never looks like a waiting prompt.
 
 ```toml

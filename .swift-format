@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "indentation": { "spaces": 4 },
+  "lineLength": 100,
+  "respectsExistingLineBreaks": true,
+  "lineBreakBeforeEachArgument": false,
+  "indentConditionalCompilationBlocks": false,
+  "rules": {
+    "AlwaysUseLowerCamelCase": true,
+    "DoNotUseSemicolons": true,
+    "OrderedImports": true,
+    "UseShorthandTypeNames": true,
+    "AllPublicDeclarationsHaveDocumentation": false,
+    "BeginDocumentationCommentWithOneLineSummary": false,
+    "NoBlockComments": false
+  }
+}

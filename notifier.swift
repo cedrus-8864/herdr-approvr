@@ -86,7 +86,7 @@ struct Config {
 func loadConfig() -> Config {
     var config = Config()
     guard let dir = ProcessInfo.processInfo.environment["HERDR_PLUGIN_CONFIG_DIR"],
-          let text = try? String(contentsOfFile: dir + "/config.toml", encoding: .utf8)
+        let text = try? String(contentsOfFile: dir + "/config.toml", encoding: .utf8)
     else { return config }
     for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
         let line = rawLine.trimmingCharacters(in: .whitespaces)
@@ -108,7 +108,8 @@ func loadConfig() -> Config {
         // "" is a valid choice: it formats to nothing, and the empty-subtitle
         // fallback then renders a minimal "<Agent> needs input|finished".
         case "subtitle_format": config.subtitleFormat = raw
-        case "done_dismiss_seconds": config.doneDismissSeconds = max(0, Int(raw) ?? config.doneDismissSeconds)
+        case "done_dismiss_seconds":
+            config.doneDismissSeconds = max(0, Int(raw) ?? config.doneDismissSeconds)
         default: break
         }
     }
@@ -174,7 +175,8 @@ let chromeMarkers: Set<Character> = ["✻", "⏺", "⎿", "❯", "✳", "✽", "
 // as rendered by Claude Code and similar agents, plus the approval block above
 // it. Returns nil when the visible screen holds no such list.
 func parseApproval(_ text: String) -> Approval? {
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map { rawLine -> String in
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map {
+        rawLine -> String in
         var line = String(rawLine)
         line.removeAll { char in
             if let scalar = char.unicodeScalars.first, char.unicodeScalars.count == 1 {
@@ -182,7 +184,8 @@ func parseApproval(_ text: String) -> Approval? {
             }
             return false
         }
-        return line.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "│┃|")))
+        return line.trimmingCharacters(
+            in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "│┃|")))
     }
 
     var start = -1
@@ -197,7 +200,7 @@ func parseApproval(_ text: String) -> Approval? {
     var options: [(digit: String, label: String)] = []
     for index in start..<lines.count {
         guard let match = lines[index].wholeMatch(of: optionLine) else {
-            if options.isEmpty { continue } else { break } // wrapped label line -> list ended
+            if options.isEmpty { continue } else { break }  // wrapped label line -> list ended
         }
         if Int(match.1) != options.count + 1 { break }
         options.append((String(match.1), String(match.2).trimmingCharacters(in: .whitespaces)))
@@ -241,9 +244,11 @@ let center = UNUserNotificationCenter.current()
 // notification so its delayed remover can verify it is still the same instance
 // before removing -- a request id of its own would be cleaner, but usernoted
 // then never delivers the body-click response (verified by A/B on macOS 26.5).
-func post(title: String, subtitle: String, message: String, group: String, sound: String,
-          paneId: String, herdr: String, stamp: String? = nil,
-          actions: [(digit: String, label: String)]) {
+func post(
+    title: String, subtitle: String, message: String, group: String, sound: String,
+    paneId: String, herdr: String, stamp: String? = nil,
+    actions: [(digit: String, label: String)]
+) {
     let semaphore = DispatchSemaphore(value: 0)
     var authorized = false
     center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
@@ -288,7 +293,9 @@ func post(title: String, subtitle: String, message: String, group: String, sound
 
     let request = UNNotificationRequest(identifier: group, content: content, trigger: nil)
     center.add(request) { error in
-        if let error { FileHandle.standardError.write("post failed: \(error)\n".data(using: .utf8)!) }
+        if let error {
+            FileHandle.standardError.write("post failed: \(error)\n".data(using: .utf8)!)
+        }
         semaphore.signal()
     }
     semaphore.wait()
@@ -311,8 +318,8 @@ func removeIfStamped(_ identifier: String, stamp: String) {
     var matches = false
     center.getDeliveredNotifications { delivered in
         matches = delivered.contains {
-            $0.request.identifier == identifier &&
-            ($0.request.content.userInfo["stamp"] as? String) == stamp
+            $0.request.identifier == identifier
+                && ($0.request.content.userInfo["stamp"] as? String) == stamp
         }
         semaphore.signal()
     }
@@ -329,8 +336,10 @@ func spawnDetachedExpiry(seconds: Int, identifier: String, stamp: String) {
     let process = Process()
     let selfPath = Bundle.main.executablePath ?? CommandLine.arguments[0]
     process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = ["-c", "sleep \(seconds); exec \"$0\" --remove \"$1\" --stamp \"$2\"",
-                         selfPath, identifier, stamp]
+    process.arguments = [
+        "-c", "sleep \(seconds); exec \"$0\" --remove \"$1\" --stamp \"$2\"",
+        selfPath, identifier, stamp,
+    ]
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
     try? process.run()
@@ -350,9 +359,10 @@ func handleEvent() {
         .flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
     let contextPane = context?["pane"] as? [String: Any]
 
-    guard let paneId = (event?["pane_id"] as? String)
-        ?? (contextPane?["pane_id"] as? String)
-        ?? env["HERDR_PANE_ID"]
+    guard
+        let paneId = (event?["pane_id"] as? String)
+            ?? (contextPane?["pane_id"] as? String)
+            ?? env["HERDR_PANE_ID"]
     else { return }
     let config = loadConfig()
     var herdr = env["HERDR_BIN_PATH"] ?? "herdr"
@@ -377,7 +387,8 @@ func handleEvent() {
     let isDone = status == "done"
     if event != nil && status != "blocked" && !(isDone && config.notifyDone) { return }
 
-    let agent = (event?["display_agent"] as? String)
+    let agent =
+        (event?["display_agent"] as? String)
         ?? (event?["agent"] as? String)
         ?? (contextPane?["agent"] as? String)
         ?? "agent"
@@ -387,11 +398,15 @@ func handleEvent() {
 
     // Pane record carries the identifiers the subtitle tokens draw on
     // (tab_id, workspace_id, cwd) plus the focus check below.
-    let pane = (herdrJSON(herdr, ["pane", "get", paneId])?["result"] as? [String: Any])?["pane"] as? [String: Any]
+    let pane =
+        (herdrJSON(herdr, ["pane", "get", paneId])?["result"] as? [String: Any])?["pane"]
+        as? [String: Any]
     var tabLabel = ""
     if let tabId = pane?["tab_id"] as? String,
-       let tab = (herdrJSON(herdr, ["tab", "get", tabId])?["result"] as? [String: Any])?["tab"] as? [String: Any],
-       let label = tab["label"] as? String {
+        let tab = (herdrJSON(herdr, ["tab", "get", tabId])?["result"] as? [String: Any])?["tab"]
+            as? [String: Any],
+        let label = tab["label"] as? String
+    {
         tabLabel = label
     } else if let label = pane?["label"] as? String {
         tabLabel = label
@@ -405,9 +420,13 @@ func handleEvent() {
     // A finished agent has no prompt to parse and nothing to answer: report the
     // topic and let the click take the user there.
     // "visible" = the current screen -- an approval UI is on it by definition.
-    let approval: Approval? = isDone ? nil : parseApproval(
-        runProcess(herdr, ["pane", "read", paneId, "--source", "visible", "--lines", "40"]).stdout
-    )
+    let approval: Approval? =
+        isDone
+        ? nil
+        : parseApproval(
+            runProcess(herdr, ["pane", "read", paneId, "--source", "visible", "--lines", "40"])
+                .stdout
+        )
 
     var message = topic.isEmpty ? "Waiting for your answer" : topic
     if isDone {
@@ -424,17 +443,22 @@ func handleEvent() {
     // up lazily -- only when the template actually asks for it.
     var workspace = ""
     if config.subtitleFormat.contains("{workspace}"),
-       let wsId = pane?["workspace_id"] as? String {
-        workspace = ((herdrJSON(herdr, ["workspace", "get", wsId])?["result"] as? [String: Any])?["workspace"] as? [String: Any])?["label"] as? String ?? ""
+        let wsId = pane?["workspace_id"] as? String
+    {
+        workspace =
+            ((herdrJSON(herdr, ["workspace", "get", wsId])?["result"] as? [String: Any])?[
+                "workspace"] as? [String: Any])?["label"] as? String ?? ""
     }
     let cwd = (pane?["cwd"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
-    var subtitle = applyFormat(config.subtitleFormat, [
-        "workspace": workspace,
-        "agent": prettyAgent(agent),
-        "topic": topic,
-        "cwd": cwd,
-        "tab": tabLabel,
-    ])
+    var subtitle = applyFormat(
+        config.subtitleFormat,
+        [
+            "workspace": workspace,
+            "agent": prettyAgent(agent),
+            "topic": topic,
+            "cwd": cwd,
+            "tab": tabLabel,
+        ])
     // A finished agent's message is just its topic, so preserve the
     // finished/needs-input distinction the template itself may not carry.
     if subtitle.isEmpty {
@@ -449,9 +473,10 @@ func handleEvent() {
     // re-find before removing -- that is what keeps the remover off a prompt
     // that takes over the pane inside the delay window.
     let stamp = isDone ? String(Int(Date().timeIntervalSince1970 * 1000)) : nil
-    post(title: "Herdr", subtitle: subtitle, message: message, group: paneId,
-         sound: config.sound, paneId: paneId, herdr: herdr, stamp: stamp,
-         actions: approval?.options ?? [])
+    post(
+        title: "Herdr", subtitle: subtitle, message: message, group: paneId,
+        sound: config.sound, paneId: paneId, herdr: herdr, stamp: stamp,
+        actions: approval?.options ?? [])
     if let stamp, config.doneDismissSeconds > 0 {
         spawnDetachedExpiry(seconds: config.doneDismissSeconds, identifier: paneId, stamp: stamp)
     }
@@ -461,11 +486,17 @@ func handleEvent() {
 // terminal is the frontmost app -- then herdr's own in-app toast is enough.
 func userIsWatching(_ pane: [String: Any]?) -> Bool {
     guard pane?["focused"] as? Bool == true else { return false }
-    let front = runProcess("/usr/bin/osascript",
-        ["-e", "tell application \"System Events\" to name of first process whose frontmost is true"]
+    let front = runProcess(
+        "/usr/bin/osascript",
+        [
+            "-e",
+            "tell application \"System Events\" to name of first process whose frontmost is true",
+        ]
     ).stdout.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     if front.isEmpty { return false }
-    return ["kitty", "ghostty", "iterm", "wezterm", "alacritty", "terminal"].contains { front.contains($0) }
+    return ["kitty", "ghostty", "iterm", "wezterm", "alacritty", "terminal"].contains {
+        front.contains($0)
+    }
 }
 
 // herdr can post its own system notification for the same blocked agent, which
@@ -474,8 +505,11 @@ func userIsWatching(_ pane: [String: Any]?) -> Bool {
 func warnIfHerdrAlsoNotifies() {
     let path = ("~/.config/herdr/config.toml" as NSString).expandingTildeInPath
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return }
-    if text.range(of: #"(?m)^\s*delivery\s*=\s*["']system["']"#, options: .regularExpression) != nil {
-        print("note: herdr [ui.toast] delivery = \"system\" also posts a notification for this event; set it to \"herdr\" to keep only ours")
+    if text.range(of: #"(?m)^\s*delivery\s*=\s*["']system["']"#, options: .regularExpression) != nil
+    {
+        print(
+            "note: herdr [ui.toast] delivery = \"system\" also posts a notification for this event; set it to \"herdr\" to keep only ours"
+        )
     }
 }
 
@@ -519,7 +553,9 @@ final class Responder: NSObject, UNUserNotificationCenterDelegate, NSApplication
     }
 
     private func stillBlocked(_ paneId: String, herdr: String) -> Bool {
-        let pane = (herdrJSON(herdr, ["pane", "get", paneId])?["result"] as? [String: Any])?["pane"] as? [String: Any]
+        let pane =
+            (herdrJSON(herdr, ["pane", "get", paneId])?["result"] as? [String: Any])?["pane"]
+            as? [String: Any]
         return pane?["agent_status"] as? String == "blocked"
     }
 
@@ -528,8 +564,10 @@ final class Responder: NSObject, UNUserNotificationCenterDelegate, NSApplication
         // jumps workspace + tab + pane. It only switches inside herdr, so the
         // terminal app still needs to come forward. Best effort.
         runProcess(herdr, ["agent", "focus", paneId])
-        let terminals = [("kitty", "kitty"), ("ghostty", "Ghostty"), ("iTerm2", "iTerm"),
-                         ("wezterm-gui", "WezTerm"), ("alacritty", "Alacritty"), ("Terminal", "Terminal")]
+        let terminals = [
+            ("kitty", "kitty"), ("ghostty", "Ghostty"), ("iTerm2", "iTerm"),
+            ("wezterm-gui", "WezTerm"), ("alacritty", "Alacritty"), ("Terminal", "Terminal"),
+        ]
         for (processName, appName) in terminals {
             if runProcess("/usr/bin/pgrep", ["-xq", processName]).status == 0 {
                 runProcess("/usr/bin/open", ["-a", appName])
@@ -546,83 +584,102 @@ final class Responder: NSObject, UNUserNotificationCenterDelegate, NSApplication
 func selfTest() -> Never {
     var failures = 0
     func expect(_ condition: Bool, _ label: String) {
-        if !condition { failures += 1; print("FAIL: \(label)") }
+        if !condition {
+            failures += 1
+            print("FAIL: \(label)")
+        }
     }
 
     let claudePrompt = """
-    │ Bash(rm -rf node_modules)                                    │
-    │                                                              │
-    │ Do you want to proceed?                                      │
-    │ ❯ 1. Yes                                                     │
-    │   2. Yes, and don't ask again for rm commands in this repo   │
-    │   3. No, and tell Claude what to do differently (esc)        │
-    """
+        │ Bash(rm -rf node_modules)                                    │
+        │                                                              │
+        │ Do you want to proceed?                                      │
+        │ ❯ 1. Yes                                                     │
+        │   2. Yes, and don't ask again for rm commands in this repo   │
+        │   3. No, and tell Claude what to do differently (esc)        │
+        """
     if let result = parseApproval(claudePrompt) {
         expect(result.options.count == 3, "claude prompt: 3 options")
-        expect(result.options[0].digit == "1" && result.options[0].label == "Yes", "claude prompt: option 1")
+        expect(
+            result.options[0].digit == "1" && result.options[0].label == "Yes",
+            "claude prompt: option 1")
         expect(result.options[2].digit == "3", "claude prompt: option 3")
         expect(result.question == "Do you want to proceed?", "claude prompt: question")
-    } else { expect(false, "claude prompt detected") }
+    } else {
+        expect(false, "claude prompt detected")
+    }
 
-    expect(parseApproval("$ ls\nREADME.md notifier.swift\n$") == nil, "no false positive on plain shell")
+    expect(
+        parseApproval("$ ls\nREADME.md notifier.swift\n$") == nil,
+        "no false positive on plain shell")
 
     let wrapped = """
-     Allow this tool?
-     ❯ 1. Yes
-       2. No, and tell Claude what to
-          do differently
-    """
+         Allow this tool?
+         ❯ 1. Yes
+           2. No, and tell Claude what to
+              do differently
+        """
     if let result = parseApproval(wrapped) {
         expect(result.options.count == 2, "wrapped label: 2 options")
         expect(result.question == "Allow this tool?", "wrapped label: question")
-    } else { expect(false, "wrapped label detected") }
+    } else {
+        expect(false, "wrapped label detected")
+    }
 
     let boxed = """
-    ✻ Baked for 9s
-    ────────────────────────────────────────
-     Bash command
-       rtk git stash push -q -- src/services/fetch.ts && npx vue-tsc --noEmit
-       Test removing fetch.ts AbortSignal
-     This command requires approval
-     Do you want to proceed?
-     ❯ 1. Yes
-       2. Yes, and don't ask again for git checkout, rtk npx, and echo commands
-       3. No
-     Esc to cancel · Tab to amend · ctrl+e to explain
-    """
+        ✻ Baked for 9s
+        ────────────────────────────────────────
+         Bash command
+           rtk git stash push -q -- src/services/fetch.ts && npx vue-tsc --noEmit
+           Test removing fetch.ts AbortSignal
+         This command requires approval
+         Do you want to proceed?
+         ❯ 1. Yes
+           2. Yes, and don't ask again for git checkout, rtk npx, and echo commands
+           3. No
+         Esc to cancel · Tab to amend · ctrl+e to explain
+        """
     if let result = parseApproval(boxed) {
         expect(result.options.count == 3, "boxed prompt: 3 options")
         expect(result.context.first == "Bash command", "boxed prompt: context head")
-        expect(result.context.contains { $0.contains("rtk git stash push") }, "boxed prompt: command in context")
-        expect(!result.context.contains { $0.contains("Baked") }, "boxed prompt: rule stops context")
+        expect(
+            result.context.contains { $0.contains("rtk git stash push") },
+            "boxed prompt: command in context")
+        expect(
+            !result.context.contains { $0.contains("Baked") }, "boxed prompt: rule stops context")
         expect(result.question == "Do you want to proceed?", "boxed prompt: question")
-    } else { expect(false, "boxed prompt detected") }
+    } else {
+        expect(false, "boxed prompt detected")
+    }
 
     let long = """
-    ✻ Baked for 3m 2s
-     Bash command
-       git commit -m "$(cat <<'EOF'
-       refactor: strip unrelated changes
-       line3
-       line4
-       line5
-       line6
-       EOF
-       Commit product-picker removal
-     This command requires approval
-     Do you want to proceed?
-     ❯ 1. Yes
-       2. Yes, and don't ask again
-       3. No
-    """
+        ✻ Baked for 3m 2s
+         Bash command
+           git commit -m "$(cat <<'EOF'
+           refactor: strip unrelated changes
+           line3
+           line4
+           line5
+           line6
+           EOF
+           Commit product-picker removal
+         This command requires approval
+         Do you want to proceed?
+         ❯ 1. Yes
+           2. Yes, and don't ask again
+           3. No
+        """
     if let result = parseApproval(long) {
         expect(result.options.count == 3, "long command: 3 options")
         expect(result.context.first == "Bash command", "long command: context head")
         expect(result.context.contains("…"), "long command: compressed")
         expect(result.context.last == "Do you want to proceed?", "long command: question last")
         expect(result.context.count == 7, "long command: 7 context lines")
-        expect(!result.context.contains { $0.contains("Baked") }, "long command: chrome stops context")
-    } else { expect(false, "long command detected") }
+        expect(
+            !result.context.contains { $0.contains("Baked") }, "long command: chrome stops context")
+    } else {
+        expect(false, "long command detected")
+    }
 
     // Agent name casing.
     expect(prettyAgent("claude") == "Claude", "prettyAgent: known lower-case")
@@ -631,33 +688,47 @@ func selfTest() -> Never {
     expect(prettyAgent("") == "", "prettyAgent: empty stays empty")
 
     // Subtitle templates.
-    let tok = ["workspace": "herdr", "agent": "Claude", "topic": "Fix the parser bug",
-               "cwd": "my-project", "tab": "1"]
+    let tok = [
+        "workspace": "herdr", "agent": "Claude", "topic": "Fix the parser bug",
+        "cwd": "my-project", "tab": "1",
+    ]
     expect(applyFormat("{workspace} · {agent}", tok) == "herdr · Claude", "format: default")
-    expect(applyFormat("{agent}: {topic}", tok) == "Claude: Fix the parser bug", "format: agent+topic")
+    expect(
+        applyFormat("{agent}: {topic}", tok) == "Claude: Fix the parser bug", "format: agent+topic")
     expect(applyFormat("{unknown}", tok) == "{unknown}", "format: unknown left literal")
     // An empty token must not strand its separator.
     let noWs = ["workspace": "", "agent": "Claude", "topic": "", "cwd": "", "tab": "1"]
-    expect(applyFormat("{workspace} · {agent}", noWs) == "Claude", "format: empty workspace trims separator")
+    expect(
+        applyFormat("{workspace} · {agent}", noWs) == "Claude",
+        "format: empty workspace trims separator")
     expect(applyFormat("{agent} — {cwd}", noWs) == "Claude", "format: empty cwd trims separator")
     // A separator repeated across a gap collapses without doubling spaces, and
     // strands at the start disappear entirely.
     let midGap = ["workspace": "herdr", "agent": "", "topic": "Fix bug", "cwd": "", "tab": ""]
-    expect(applyFormat("{workspace} · {agent} · {topic}", midGap) == "herdr · Fix bug",
-           "format: doubled middle separator collapses cleanly")
+    expect(
+        applyFormat("{workspace} · {agent} · {topic}", midGap) == "herdr · Fix bug",
+        "format: doubled middle separator collapses cleanly")
     let twoGaps = ["workspace": "", "agent": "", "topic": "Fix bug", "cwd": "", "tab": ""]
-    expect(applyFormat("{workspace} · {agent} · {topic}", twoGaps) == "Fix bug",
-           "format: leading separator run removed")
+    expect(
+        applyFormat("{workspace} · {agent} · {topic}", twoGaps) == "Fix bug",
+        "format: leading separator run removed")
     // Trimming targets template separators, never characters inside content.
     let dashCwd = ["workspace": "", "agent": "", "topic": "", "cwd": "my-app-", "tab": ""]
     expect(applyFormat("{cwd}", dashCwd) == "my-app-", "format: content trailing dash preserved")
-    let question = ["workspace": "", "agent": "Claude", "topic": "Is it done?", "cwd": "", "tab": ""]
-    expect(applyFormat("{agent}: {topic}", question) == "Claude: Is it done?", "format: content question mark preserved")
+    let question = [
+        "workspace": "", "agent": "Claude", "topic": "Is it done?", "cwd": "", "tab": "",
+    ]
+    expect(
+        applyFormat("{agent}: {topic}", question) == "Claude: Is it done?",
+        "format: content question mark preserved")
     // An empty template stays empty, which the caller turns into the minimal
     // "<Agent> needs input|finished" subtitle.
     expect(applyFormat("", tok) == "", "format: empty template stays empty")
 
-    if failures == 0 { print("self-test OK"); exit(0) }
+    if failures == 0 {
+        print("self-test OK")
+        exit(0)
+    }
     exit(1)
 }
 
@@ -675,7 +746,9 @@ if options.selfTest { selfTest() }
 if options.status {
     let semaphore = DispatchSemaphore(value: 0)
     center.getNotificationSettings { settings in
-        print("authorization: \(settings.authorizationStatus.rawValue) (2=authorized), alertStyle: \(settings.alertStyle.rawValue) (2=alert 1=banner 0=none)")
+        print(
+            "authorization: \(settings.authorizationStatus.rawValue) (2=authorized), alertStyle: \(settings.alertStyle.rawValue) (2=alert 1=banner 0=none)"
+        )
         semaphore.signal()
     }
     semaphore.wait()
@@ -703,9 +776,10 @@ if let removeId = options.remove {
     exit(0)
 }
 if !options.title.isEmpty {
-    post(title: options.title, subtitle: options.subtitle, message: options.message,
-         group: options.group, sound: options.sound, paneId: options.paneId,
-         herdr: options.herdr, actions: options.actions)
+    post(
+        title: options.title, subtitle: options.subtitle, message: options.message,
+        group: options.group, sound: options.sound, paneId: options.paneId,
+        herdr: options.herdr, actions: options.actions)
     exit(0)
 }
 
@@ -716,7 +790,9 @@ let responder = Responder()
 center.delegate = responder
 let app = NSApplication.shared
 app.delegate = responder
-log("responder: launched, exe=\(Bundle.main.executablePath ?? "?") bundleId=\(Bundle.main.bundleIdentifier ?? "?")")
+log(
+    "responder: launched, exe=\(Bundle.main.executablePath ?? "?") bundleId=\(Bundle.main.bundleIdentifier ?? "?")"
+)
 DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
     log("responder: nothing delivered within 15s, exiting")
     NSApp.terminate(nil)

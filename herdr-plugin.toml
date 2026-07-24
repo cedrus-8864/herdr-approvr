@@ -8,9 +8,9 @@ min_herdr_version = "0.7.5"
 description = "Answer agent permission prompts straight from a macOS notification with real buttons. Single Swift binary on UNUserNotificationCenter."
 platforms = ["macos"]
 
-# Wrap alerter in our own .app bundle. Without it macOS files the notifications
-# under Terminal, so their alert style cannot be set and the buttons vanish with
-# the banner. Fatal on failure: a silent fallback would ship the broken UX.
+# Compile the Swift notifier into HerdrPromptReply.app.
+# UNUserNotificationCenter refuses bare binaries, so the bundle is a hard
+# requirement. Fatal on failure: a silent fallback would ship the broken UX.
 [[build]]
 command = ["./build-app.sh"]
 platforms = ["macos"]

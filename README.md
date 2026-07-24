@@ -23,8 +23,8 @@ notifier, nothing waiting in the background.
 
 ## Install
 
-Needs macOS with the Xcode Command Line Tools (`xcode-select --install` — you
-have them if you have git). No other runtime: the plugin is a single Swift
+Needs macOS 13+ with the Xcode Command Line Tools (`xcode-select --install` —
+you have them if you have git). No other runtime: the plugin is a single Swift
 binary compiled at install.
 
 ```sh
@@ -165,8 +165,11 @@ own schedule. Automating this needs an uninstall hook in herdr, tracked in
   Banners/Temporary; set **Herdr Prompt Reply** to **Alerts**/**Persistent**.
 - **Two notifications per prompt** → herdr's own system toast is on; set
   `[ui.toast] delivery = "herdr"`.
-- **No notification at all** → the app bundle is missing; run `./build-app.sh`
-  from the plugin directory. Parser check: `assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply --self-test`.
+- **No notification at all** → check authorization first:
+  `assets/HerdrPromptReply.app/Contents/MacOS/HerdrPromptReply --status`
+  (authorization 2 and alertStyle 2 are what you want; anything else → the
+  Launch Services bootstrap under Install). If the bundle itself is missing,
+  run `./build-app.sh`. Parser check: same binary with `--self-test`.
 - Posting outcomes: `herdr plugin log list --plugin cedrus.prompt-reply --limit 5`.
   Click outcomes: `tail ~/Library/Logs/HerdrPromptReply.log`.
 

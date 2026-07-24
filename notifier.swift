@@ -101,7 +101,9 @@ func loadConfig() -> Config {
         case "sound": config.sound = raw
         case "suppress_when_focused": config.suppressWhenFocused = raw != "false"
         case "notify_done": config.notifyDone = raw == "true"
-        case "subtitle_format": if !raw.isEmpty { config.subtitleFormat = raw }
+        // "" is a valid choice: it formats to nothing, and the empty-subtitle
+        // fallback then renders a minimal "<Agent> needs input|finished".
+        case "subtitle_format": config.subtitleFormat = raw
         default: break
         }
     }
@@ -593,6 +595,9 @@ func selfTest() -> Never {
     expect(applyFormat("{cwd}", dashCwd) == "my-app-", "format: content trailing dash preserved")
     let question = ["workspace": "", "agent": "Claude", "topic": "Is it done?", "cwd": "", "tab": ""]
     expect(applyFormat("{agent}: {topic}", question) == "Claude: Is it done?", "format: content question mark preserved")
+    // An empty template stays empty, which the caller turns into the minimal
+    // "<Agent> needs input|finished" subtitle.
+    expect(applyFormat("", tok) == "", "format: empty template stays empty")
 
     if failures == 0 { print("self-test OK"); exit(0) }
     exit(1)

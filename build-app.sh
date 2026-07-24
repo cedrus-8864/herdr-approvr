@@ -77,7 +77,9 @@ fi
 
 cat <<'EOF'
 
-NEXT: trigger one notification, then set "Herdr Prompt Reply" to Alerts in
-System Settings > Notifications. As a Banner it slides away in seconds and
-takes the answer buttons with it.
+NEXT: trigger one notification, then set "Herdr Prompt Reply" to Alerts
+(called Persistent on newer macOS) in System Settings > Notifications. As a
+Banner/Temporary it slides away in seconds and takes the answer buttons with
+it. Entry missing in Settings? Launch the app once through Launch Services to
+create it: open <plugin-root>/assets/HerdrPromptReply.app
 EOF

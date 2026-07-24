@@ -39,10 +39,17 @@ around waiting.
 
 Then, once:
 
-1. Trigger a notification (any permission prompt), and set **Herdr Prompt Reply** to
-   **Alerts** in System Settings → Notifications — as a Banner it slides away
-   in seconds, taking the buttons with it. The entry appears after the first
-   notification.
+1. Trigger a notification (any permission prompt), and set **Herdr Prompt Reply**
+   to **Alerts** — called **Persistent** on newer macOS — in System Settings →
+   Notifications. As a Banner/Temporary it slides away in seconds, taking the
+   buttons with it. If the entry is missing there, launch the app once through
+   Launch Services to create it (macOS silently refuses the request from a
+   terminal-spawned process):
+
+   ```sh
+   open "$(herdr plugin list --plugin cedrus.prompt-reply --json | python3 -c \
+     "import json,sys; print(json.load(sys.stdin)['result']['plugins'][0]['plugin_root'])")/assets/HerdrPromptReply.app"
+   ```
 2. If the install output warns that herdr's `[ui.toast] delivery = "system"` is
    set, switch it to `"herdr"` (see below) — otherwise herdr posts a second,
    buttonless notification for the same event.
@@ -155,7 +162,7 @@ own schedule. Automating this needs an uninstall hook in herdr, tracked in
 ## Troubleshooting
 
 - **Buttons vanish before you can click** → the notification style is still
-  Banners; set **Herdr Prompt Reply** to **Alerts**.
+  Banners/Temporary; set **Herdr Prompt Reply** to **Alerts**/**Persistent**.
 - **Two notifications per prompt** → herdr's own system toast is on; set
   `[ui.toast] delivery = "herdr"`.
 - **No notification at all** → the app bundle is missing; run `./build-app.sh`

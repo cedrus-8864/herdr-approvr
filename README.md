@@ -69,6 +69,7 @@ Optional — `config.toml` in `herdr plugin config-dir cedrus.approvr`.
 | `sound` | `""` | Sound name (`"Ping"`, `"Glass"`, …); empty is silent. |
 | `suppress_when_focused` | `true` | Stay quiet when you're already looking at the pane. |
 | `notify_done` | `false` | Also notify when an agent finishes (no buttons; click jumps to the pane). |
+| `done_dismiss_seconds` | `10` | Auto-withdraw finished notifications after this long; `0` keeps them up. Prompts always stay until answered. |
 | `subtitle_format` | `"{workspace} · {agent}"` | Template for the subtitle line — see below. |
 
 ### Subtitle template

@@ -77,6 +77,10 @@ struct Config {
     // the user say *which* session is asking in their own terms.
     // Tokens: {workspace} {agent} {topic} {cwd} {tab}
     var subtitleFormat = "{workspace} · {agent}"
+    // A finished notification needs no interaction, so unlike a prompt it should
+    // not sit on screen under the Alerts style. Auto-withdraw it after this many
+    // seconds; 0 keeps it until clicked or its pane is focused.
+    var doneDismissSeconds = 10
 }
 
 func loadConfig() -> Config {
@@ -104,6 +108,7 @@ func loadConfig() -> Config {
         // "" is a valid choice: it formats to nothing, and the empty-subtitle
         // fallback then renders a minimal "<Agent> needs input|finished".
         case "subtitle_format": config.subtitleFormat = raw
+        case "done_dismiss_seconds": config.doneDismissSeconds = max(0, Int(raw) ?? config.doneDismissSeconds)
         default: break
         }
     }
@@ -231,8 +236,13 @@ func buttonLabel(_ label: String) -> String {
 
 let center = UNUserNotificationCenter.current()
 
-func post(title: String, subtitle: String, message: String, group: String, sound: String,
-          paneId: String, herdr: String, actions: [(digit: String, label: String)]) {
+// `group` is the pane id and becomes the threadIdentifier (visual grouping and
+// the unit pane-focus withdrawal works on). `identifier` is the request id:
+// prompts use the pane id itself so a newer prompt replaces the older one;
+// finished notifications get a unique id so their delayed remover can never
+// touch anything else.
+func post(title: String, subtitle: String, message: String, group: String, identifier: String,
+          sound: String, paneId: String, herdr: String, actions: [(digit: String, label: String)]) {
     let semaphore = DispatchSemaphore(value: 0)
     var authorized = false
     center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
@@ -271,13 +281,13 @@ func post(title: String, subtitle: String, message: String, group: String, sound
         content.categoryIdentifier = group
     }
 
-    let request = UNNotificationRequest(identifier: group, content: content, trigger: nil)
+    let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
     center.add(request) { error in
         if let error { FileHandle.standardError.write("post failed: \(error)\n".data(using: .utf8)!) }
         semaphore.signal()
     }
     semaphore.wait()
-    print("posted: \(group)")
+    print("posted: \(identifier)")
 }
 
 func remove(_ identifier: String) {
@@ -285,6 +295,37 @@ func remove(_ identifier: String) {
     center.removePendingNotificationRequests(withIdentifiers: [identifier])
     // Removal is fire-and-forget in the API; give it a beat to land.
     Thread.sleep(forTimeInterval: 0.3)
+}
+
+// Withdraw everything a pane has on screen -- prompts (id == pane id) and
+// finished notifications (unique ids) share the pane's threadIdentifier.
+// `except` lets a fresh prompt clear stale finished notifications without
+// touching itself.
+func removeThread(_ thread: String, except keep: String? = nil) {
+    let semaphore = DispatchSemaphore(value: 0)
+    var identifiers: [String] = []
+    center.getDeliveredNotifications { delivered in
+        identifiers = delivered
+            .filter { $0.request.content.threadIdentifier == thread && $0.request.identifier != keep }
+            .map { $0.request.identifier }
+        semaphore.signal()
+    }
+    semaphore.wait()
+    if !identifiers.isEmpty { center.removeDeliveredNotifications(withIdentifiers: identifiers) }
+    if keep != thread { center.removePendingNotificationRequests(withIdentifiers: [thread]) }
+    Thread.sleep(forTimeInterval: 0.3)
+}
+
+// Fire-and-forget child that outlives this process; used to expire a finished
+// notification after `done_dismiss_seconds`.
+func spawnDetached(_ arguments: [String]) {
+    let process = Process()
+    let selfPath = Bundle.main.executablePath ?? CommandLine.arguments[0]
+    process.executableURL = URL(fileURLWithPath: selfPath)
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    try? process.run()
 }
 
 // ---------------------------------------------------------------------------
@@ -315,10 +356,11 @@ func handleEvent() {
         if !resolved.isEmpty { herdr = resolved }
     }
 
-    // Arriving at the pane answers the notification's question: withdraw it
-    // rather than leave a stale prompt on screen.
+    // Arriving at the pane answers the notification's question: withdraw
+    // everything it has on screen (the prompt and any finished notifications
+    // share the pane's thread) rather than leave stale entries behind.
     if env["HERDR_PLUGIN_EVENT"] == "pane.focused" {
-        remove(paneId)
+        removeThread(paneId)
         return
     }
 
@@ -395,8 +437,20 @@ func handleEvent() {
     }
 
     warnIfHerdrAlsoNotifies()
+    // Prompts reuse the pane id so a newer prompt replaces the older one.
+    // Finished notifications get a unique id: their delayed remover must never
+    // be able to hit a prompt that took over the pane in the meantime.
+    let identifier = isDone ? "\(paneId).done.\(Int(Date().timeIntervalSince1970 * 1000))" : paneId
+    if !isDone {
+        // A fresh prompt supersedes any finished notification still on screen.
+        removeThread(paneId, except: paneId)
+    }
     post(title: "Herdr", subtitle: subtitle, message: message, group: paneId,
-         sound: config.sound, paneId: paneId, herdr: herdr, actions: approval?.options ?? [])
+         identifier: identifier, sound: config.sound, paneId: paneId, herdr: herdr,
+         actions: approval?.options ?? [])
+    if isDone && config.doneDismissSeconds > 0 {
+        spawnDetached(["--remove", identifier, "--delay", String(config.doneDismissSeconds)])
+    }
 }
 
 // You are "looking at" the pane when it is the focused pane in herdr *and* the
@@ -633,13 +687,16 @@ if options.list {
     exit(0)
 }
 if let removeId = options.remove {
+    // --delay is how a finished notification expires: post spawns a detached
+    // `--remove <unique-id> --delay N` child that sleeps out the display time.
+    if options.delay > 0 { Thread.sleep(forTimeInterval: TimeInterval(options.delay)) }
     remove(removeId)
     exit(0)
 }
 if !options.title.isEmpty {
     post(title: options.title, subtitle: options.subtitle, message: options.message,
-         group: options.group, sound: options.sound, paneId: options.paneId,
-         herdr: options.herdr, actions: options.actions)
+         group: options.group, identifier: options.group, sound: options.sound,
+         paneId: options.paneId, herdr: options.herdr, actions: options.actions)
     exit(0)
 }
 
@@ -672,6 +729,7 @@ struct Options {
     var herdr = "herdr"
     var actions: [(digit: String, label: String)] = []
     var remove: String? = nil
+    var delay = 0
     var list = false
     var status = false
     var selfTest = false
@@ -695,6 +753,7 @@ func parseArguments() -> Options {
                 options.actions.append((String(raw[..<eq]), String(raw[raw.index(after: eq)...])))
             }
         case "--remove": options.remove = iterator.next()
+        case "--delay": options.delay = max(0, Int(iterator.next() ?? "0") ?? 0)
         case "--list": options.list = true
         case "--status": options.status = true
         case "--self-test": options.selfTest = true

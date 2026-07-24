@@ -35,3 +35,9 @@ subtitle_format = "{workspace} · {agent}"
 # the pane. Turn this on if you set herdr's [ui.toast] delivery = "herdr" and
 # still want a desktop notification when a run completes.
 notify_done = false
+
+# A finished notification needs no interaction, so it should not sit on screen
+# forever under the Alerts style: withdraw it after this many seconds (it stays
+# in Notification Center's history). 0 = keep it up until clicked or its pane is
+# focused. Prompts are never auto-withdrawn.
+done_dismiss_seconds = 10
